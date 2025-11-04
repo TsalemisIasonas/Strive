@@ -68,7 +68,7 @@ class _HomePageState extends State<HomePage> {
       db.toDoList.add([
         _newTitle,
         _newContent,
-        _newDateTime ?? DateTime.now(),
+        _newDateTime,
         false,
       ]);
     });

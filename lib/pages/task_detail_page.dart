@@ -18,7 +18,7 @@ class TaskDetailPage extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           title,
-          style: TextStyle(color: Colors.white),
+          style: const TextStyle(color: Colors.white),
         ),
         backgroundColor: darkGreen,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -39,16 +39,18 @@ class TaskDetailPage extends StatelessWidget {
                   style: const TextStyle(fontSize: 18, color: Colors.white)),
               const SizedBox(height: 16),
               Text(
-                'Due: '
-                '${dateTime.day.toString().padLeft(2, '0')}/'
-                '${dateTime.month.toString().padLeft(2, '0')}/'
-                '${dateTime.year}',
+                dateTime == null
+                    ? 'Due: No due date set'
+                    : 'Due: '
+                        '${dateTime!.day.toString().padLeft(2, '0')}/'
+                        '${dateTime!.month.toString().padLeft(2, '0')}/'
+                        '${dateTime!.year}',
                 style: const TextStyle(fontSize: 16, color: Colors.white),
               ),
               const SizedBox(height: 16),
               Text(
                 'Completed: ${completed ? "Yes" : "No"}',
-                style: TextStyle(color: Colors.white),
+                style: const TextStyle(color: Colors.white),
               ),
             ],
           ),

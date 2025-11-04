@@ -1,11 +1,10 @@
 import 'package:assignments/constants/colors.dart';
 import 'package:flutter/material.dart';
 
-
 class ToDoTile extends StatelessWidget {
   final String taskTitle;
   final String taskContent;
-  final DateTime taskDateTime;
+  final DateTime? taskDateTime;
   final bool taskCompleted;
   final bool isPinned;
   final Function(bool?)? onChanged;
@@ -74,7 +73,8 @@ class ToDoTile extends StatelessWidget {
                         Expanded(
                           child: Text(
                             taskTitle.isNotEmpty
-                                ? taskTitle[0].toUpperCase() + taskTitle.substring(1)
+                                ? taskTitle[0].toUpperCase() +
+                                    taskTitle.substring(1)
                                 : '',
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
@@ -100,27 +100,33 @@ class ToDoTile extends StatelessWidget {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
-                    child: Text(
-                      taskContent.isNotEmpty
-                          ? taskContent[0].toUpperCase() + taskContent.substring(1)
-                          : 'No content to show',
-                      maxLines: 5,
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: taskCompleted ? lightGreen : textColor,
-                        fontWeight: FontWeight.w400,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 25, vertical: 10),
+                    child: Flexible(
+                      child: Text(
+                        taskContent.isNotEmpty
+                            ? taskContent[0].toUpperCase() +
+                                taskContent.substring(1)
+                            : '',
+                        maxLines: 5,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: taskCompleted ? lightGreen : textColor,
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
                     ),
                   ),
                   const Spacer(),
                   Text(
-                    "Due Date: "
-                    "${taskDateTime.day.toString().padLeft(2, '0')}/"
-                    "${taskDateTime.month.toString().padLeft(2, '0')}/"
-                    "${taskDateTime.year}",
+                    taskDateTime == null
+                        ? ""
+                        : "Due Date: "
+                            "${taskDateTime!.day.toString().padLeft(2, '0')}/"
+                            "${taskDateTime!.month.toString().padLeft(2, '0')}/"
+                            "${taskDateTime!.year}",
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: Colors.white54,
@@ -134,12 +140,14 @@ class ToDoTile extends StatelessWidget {
                       IconButton(
                         padding: EdgeInsets.zero,
                         onPressed: deleteFunction,
-                        icon: const Icon(Icons.delete, color: Colors.white, size: 25),
+                        icon: const Icon(Icons.delete,
+                            color: Colors.white, size: 25),
                       ),
                       IconButton(
                         padding: EdgeInsets.zero,
                         onPressed: editFunction,
-                        icon: const Icon(Icons.edit, color: Colors.white, size: 25),
+                        icon: const Icon(Icons.edit,
+                            color: Colors.white, size: 25),
                       ),
                     ],
                   ),

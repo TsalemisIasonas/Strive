@@ -1,48 +1,52 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
 class ToDoDataBase {
-  List toDoList = [];
+  List<List<dynamic>> toDoList = [];
   String? userName;
-
-  // reference our box
   final _myBox = Hive.box('mybox');
 
-  // run this method if this is the 1st time ever opening this app
   void createInitialData() {
     toDoList = [
-      ["Make Tutorial", "Learn how to make a to-do app", DateTime.now(), false],
-      ["Do Exercise", "30 min run", DateTime.now(), false],
-      ["Read Book", "Finish 10 pages of your novel", DateTime.now(), false],
+      ["Make Tutorial", "Learn how to make a to-do app", null, false],
+      ["Do Exercise", "30 min run", null, false],
+      ["Read Book", "Finish 10 pages of your novel", null, false],
     ];
+    updateDataBase();
   }
 
-  // load the data from database
   void loadData() {
     final rawList = _myBox.get("TODOLIST");
 
-    // Convert older 2-element tasks into the new format
-    toDoList = rawList.map((task) {
-      if (task is List && task.length == 2) {
+    if (rawList == null) {
+      toDoList = [];
+      return;
+    }
+
+    toDoList = rawList.map<List<dynamic>>((task) {
+      if (task is List && task.length == 4) {
         return [
-          task[0],               // title
-          "",                    // content (default empty)
-          DateTime.now(),        // datetime (default now)
-          task[1],               // completed
+          task[0],
+          task[1],
+          task[2], // can be null
+          task[3],
         ];
+      } else if (task is List) {
+        final fixed = List<dynamic>.filled(4, null);
+        for (int i = 0; i < task.length && i < 4; i++) {
+          fixed[i] = task[i];
+        }
+        return fixed;
       } else {
-        return task; // already in new format
+        return ["", "", null, false];
       }
     }).toList();
-
-    //final userName = _myBox.get('USERNAME');
   }
 
-  // update the database
   void updateDataBase() {
     _myBox.put("TODOLIST", toDoList);
   }
 
-  void storeName(){
+  void storeName() {
     _myBox.put("USERNAME", userName);
   }
 }

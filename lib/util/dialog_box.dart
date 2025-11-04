@@ -6,7 +6,7 @@ class DialogBox extends StatefulWidget {
   final VoidCallback onCancel;
   final Function(String) onChangedTitle;
   final Function(String) onChangedContent;
-  final Function(DateTime) onDateTimePicked;
+  final Function(DateTime?) onDateTimePicked;
   final String? initialTitle;
   final String? initialContent;
   final DateTime? initialDateTime;
@@ -39,7 +39,8 @@ class _DialogBoxState extends State<DialogBox>
   void initState() {
     super.initState();
     titleController = TextEditingController(text: widget.initialTitle ?? '');
-    contentController = TextEditingController(text: widget.initialContent ?? '');
+    contentController =
+        TextEditingController(text: widget.initialContent ?? '');
     selectedDateTime = widget.initialDateTime;
     _controller = AnimationController(
       duration: const Duration(milliseconds: 400),
@@ -66,11 +67,15 @@ class _DialogBoxState extends State<DialogBox>
       firstDate: DateTime.now(),
       lastDate: DateTime(2100),
     );
+
     if (date != null) {
       final time = await showTimePicker(
         context: context,
-        initialTime: TimeOfDay.fromDateTime(selectedDateTime ?? DateTime.now()),
+        initialTime: selectedDateTime != null
+            ? TimeOfDay.fromDateTime(selectedDateTime!)
+            : TimeOfDay.now(),
       );
+
       if (time != null) {
         final combined = DateTime(
           date.year,
@@ -89,7 +94,7 @@ class _DialogBoxState extends State<DialogBox>
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.width * 0.8;
+    final height = MediaQuery.of(context).size.height * 0.5;
     final width = MediaQuery.of(context).size.width * 0.8;
 
     return Center(
@@ -107,7 +112,6 @@ class _DialogBoxState extends State<DialogBox>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Padding(
@@ -134,6 +138,7 @@ class _DialogBoxState extends State<DialogBox>
                       onPressed: () {
                         widget.onChangedTitle(titleController.text);
                         widget.onChangedContent(contentController.text);
+                        widget.onDateTimePicked(selectedDateTime);
                         widget.onSave();
                       },
                     ),
@@ -143,6 +148,7 @@ class _DialogBoxState extends State<DialogBox>
                       onPressed: () {
                         titleController.clear();
                         contentController.clear();
+                        widget.onDateTimePicked(null);
                         widget.onCancel();
                       },
                     ),
@@ -164,18 +170,20 @@ class _DialogBoxState extends State<DialogBox>
                     onChanged: widget.onChangedContent,
                   ),
                 ),
-                const SizedBox(height: 100),
+                const SizedBox(height: 50),
                 TextButton(
                   onPressed: _pickDateTime,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text("Pick Time & Date",
-                          style: TextStyle(
-                              color: lightGreen,
-                              fontWeight: FontWeight.w200,
-                              fontSize: 20)),
-                      const SizedBox(width: 15),
+                      Text(
+                        "Pick Time & Date",
+                        style: TextStyle(
+                            color: lightGreen,
+                            fontWeight: FontWeight.w200,
+                            fontSize: 20),
+                      ),
+                      const SizedBox(height: 5),
                       if (selectedDateTime != null)
                         Text(
                           "Time and Date Selected",
