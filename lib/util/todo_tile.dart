@@ -31,7 +31,7 @@ class ToDoTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 25.0, right: 25, top: 25),
+      padding: const EdgeInsets.only(left: 10.0, right: 10, top: 10),
       child: GestureDetector(
         onTap: onTap,
         child: Card(
@@ -45,7 +45,7 @@ class ToDoTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: Container(
               constraints: const BoxConstraints(maxWidth: 300),
-              width: 250,
+              width: 300,
               decoration: BoxDecoration(
                 color: tileBackgroundColor,
                 borderRadius: BorderRadius.circular(12),

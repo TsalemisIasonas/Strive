@@ -124,147 +124,76 @@ class _TilesLayoutState extends State<TilesLayout> {
           ),
         ),
         SizedBox(
-          height: 350,
+          height: 300,
           child: !_showGridView
-              ? widget.db.toDoList.length > 4
-                  ? GridView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.only(left: 10.0, right: 10.0),
-                      shrinkWrap: true,
-                      scrollDirection: Axis.horizontal, // horizontal scrolling
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2, // 2 rows
-                        crossAxisSpacing: 1.0,
-                        mainAxisSpacing: 8.0,
-                        childAspectRatio: 0.9, // adjust for card shape
-                      ),
-                      itemCount: filteredList.length,
-                      itemBuilder: (context, index) {
-                        final originalIndex =
-                            widget.db.toDoList.indexOf(filteredList[index]);
-                        final isPinned = filteredList[index].length > 4 &&
-                            filteredList[index][4] == true;
-                        return ToDoTile(
-                            taskTitle: filteredList[index][0],
-                            taskContent: filteredList[index][1],
-                            taskDateTime: filteredList[index][2],
-                            taskCompleted: filteredList[index][3],
-                            onChanged: (value) =>
-                                widget.onChanged(value, originalIndex),
-                            deleteFunction: () =>
-                                widget.onDelete(originalIndex),
-                            editFunction: () => widget.onEdit(originalIndex),
-                            isPinned: isPinned,
-                            onPin: () {
-                              widget.onPin(originalIndex, !isPinned);
-                              setState(() {});
-                              // Scroll to start after pin/unpin
-                              _scrollController.animateTo(
-                                0.0,
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeOut,
-                              );
-                            },
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                PageRouteBuilder(
-                                  pageBuilder: (_, __, ___) =>
-                                      TaskDetailPage(task: filteredList[index]),
-                                  transitionsBuilder:
-                                      (_, animation, __, child) {
-                                    const begin = Offset(0.0, 0.1);
-                                    const end = Offset.zero;
-                                    final slide = Tween(begin: begin, end: end)
-                                        .chain(
-                                            CurveTween(curve: Curves.easeOut));
-                                    final fade = CurvedAnimation(
-                                        parent: animation,
-                                        curve: Curves.easeIn);
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 0.0, bottom: 25.0),
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    scrollDirection: Axis.horizontal,
+                    itemCount: filteredList.length,
+                    itemBuilder: (context, index) {
+                      final originalIndex =
+                          widget.db.toDoList.indexOf(filteredList[index]);
+                      final isPinned = filteredList[index].length > 4 &&
+                          filteredList[index][4] == true;
+                      return SizedBox(
+                        width: 300, // card width
+                        height: 200, // collapsed card height
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: ToDoTile(
+                              taskTitle: filteredList[index][0],
+                              taskContent: filteredList[index][1],
+                              taskDateTime: filteredList[index][2],
+                              taskCompleted: filteredList[index][3],
+                              onChanged: (value) =>
+                                  widget.onChanged(value, originalIndex),
+                              deleteFunction: () =>
+                                  widget.onDelete(originalIndex),
+                              editFunction: () => widget.onEdit(originalIndex),
+                              isPinned: isPinned,
+                              onPin: () {
+                                widget.onPin(originalIndex, !isPinned);
+                                setState(() {});
+                                _scrollController.animateTo(
+                                  0.0,
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeOut,
+                                );
+                              },
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  PageRouteBuilder(
+                                    pageBuilder: (_, __, ___) => TaskDetailPage(
+                                        task: filteredList[index]),
+                                    transitionsBuilder:
+                                        (_, animation, __, child) {
+                                      const begin = Offset(0.0, 0.1);
+                                      const end = Offset.zero;
+                                      final slide =
+                                          Tween(begin: begin, end: end).chain(
+                                              CurveTween(
+                                                  curve: Curves.easeOut));
+                                      final fade = CurvedAnimation(
+                                          parent: animation,
+                                          curve: Curves.easeIn);
 
-                                    return SlideTransition(
-                                      position: animation.drive(slide),
-                                      child: FadeTransition(
-                                          opacity: fade, child: child),
-                                    );
-                                  },
-                                ),
-                              );
-                            });
-                      },
-                    )
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 10.0, bottom: 35.0),
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        scrollDirection: Axis.horizontal,
-                        itemCount: filteredList.length,
-                        itemBuilder: (context, index) {
-                          final originalIndex =
-                              widget.db.toDoList.indexOf(filteredList[index]);
-                          final isPinned = filteredList[index].length > 4 &&
-                              filteredList[index][4] == true;
-                          return SizedBox(
-                            width: 300, // card width
-                            height: 200, // collapsed card height
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: ToDoTile(
-                                  taskTitle: filteredList[index][0],
-                                  taskContent: filteredList[index][1],
-                                  taskDateTime: filteredList[index][2],
-                                  taskCompleted: filteredList[index][3],
-                                  onChanged: (value) =>
-                                      widget.onChanged(value, originalIndex),
-                                  deleteFunction: () =>
-                                      widget.onDelete(originalIndex),
-                                  editFunction: () =>
-                                      widget.onEdit(originalIndex),
-                                  isPinned: isPinned,
-                                  onPin: () {
-                                    widget.onPin(originalIndex, !isPinned);
-                                    setState(() {});
-                                    _scrollController.animateTo(
-                                      0.0,
-                                      duration:
-                                          const Duration(milliseconds: 300),
-                                      curve: Curves.easeOut,
-                                    );
-                                  },
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      PageRouteBuilder(
-                                        pageBuilder: (_, __, ___) =>
-                                            TaskDetailPage(
-                                                task: filteredList[index]),
-                                        transitionsBuilder:
-                                            (_, animation, __, child) {
-                                          const begin = Offset(0.0, 0.1);
-                                          const end = Offset.zero;
-                                          final slide =
-                                              Tween(begin: begin, end: end)
-                                                  .chain(CurveTween(
-                                                      curve: Curves.easeOut));
-                                          final fade = CurvedAnimation(
-                                              parent: animation,
-                                              curve: Curves.easeIn);
-
-                                          return SlideTransition(
-                                            position: animation.drive(slide),
-                                            child: FadeTransition(
-                                                opacity: fade, child: child),
-                                          );
-                                        },
-                                      ),
-                                    );
-                                  }),
-                            ),
-                          );
-                        },
-                      ),
-                    )
+                                      return SlideTransition(
+                                        position: animation.drive(slide),
+                                        child: FadeTransition(
+                                            opacity: fade, child: child),
+                                      );
+                                    },
+                                  ),
+                                );
+                              }),
+                        ),
+                      );
+                    },
+                  ),
+                )
               : Align(
                   alignment: Alignment.topCenter,
                   child: GridView.builder(
