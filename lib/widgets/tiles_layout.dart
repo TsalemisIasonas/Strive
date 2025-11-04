@@ -30,8 +30,8 @@ class _TilesLayoutState extends State<TilesLayout> {
   String _searchQuery = '';
   final ScrollController _scrollController = ScrollController();
 
-  @override
-  Widget build(BuildContext context) {
+  List<List<dynamic>> _getTop4Tasks() {
+    final now = DateTime.now();
     final filteredList = _searchQuery.isEmpty
         ? widget.db.toDoList
         : widget.db.toDoList.where((task) {
@@ -41,13 +41,36 @@ class _TilesLayoutState extends State<TilesLayout> {
                 content.contains(_searchQuery.toLowerCase());
           }).toList();
 
-    filteredList.sort((a, b) {
-      final aPinned = a.length > 4 && a[4] == true;
-      final bPinned = b.length > 4 && b[4] == true;
-      if (aPinned && !bPinned) return -1;
-      if (!aPinned && bPinned) return 1;
-      return 0;
+    // Separate tasks with a due date in the future (or immediate)
+    final dueTasks = filteredList
+        .where((task) =>
+            task[2] != null && (task[2] as DateTime).isAfter(now))
+        .toList();
+
+    // Sort due tasks by soonest date
+    dueTasks.sort((a, b) {
+      final aDate = a[2] as DateTime;
+      final bDate = b[2] as DateTime;
+      return aDate.compareTo(bDate);
     });
+
+    // Take up to 4 from due tasks
+    final topDue = dueTasks.take(4).toList();
+
+    // If less than 4, add tasks without due date or remaining tasks
+    if (topDue.length < 4) {
+      final remaining = filteredList
+          .where((task) => !topDue.contains(task))
+          .take(4 - topDue.length);
+      topDue.addAll(remaining);
+    }
+
+    return topDue;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topTasks = _getTop4Tasks();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,159 +149,107 @@ class _TilesLayoutState extends State<TilesLayout> {
         SizedBox(
           height: 300,
           child: !_showGridView
-              ? Padding(
-                  padding: const EdgeInsets.only(top: 0.0, bottom: 25.0),
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    scrollDirection: Axis.horizontal,
-                    itemCount: filteredList.length,
-                    itemBuilder: (context, index) {
-                      final originalIndex =
-                          widget.db.toDoList.indexOf(filteredList[index]);
-                      final isPinned = filteredList[index].length > 4 &&
-                          filteredList[index][4] == true;
-                      return SizedBox(
-                        width: 300, // card width
-                        height: 200, // collapsed card height
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: ToDoTile(
-                              taskTitle: filteredList[index][0],
-                              taskContent: filteredList[index][1],
-                              taskDateTime: filteredList[index][2],
-                              taskCompleted: filteredList[index][3],
-                              onChanged: (value) =>
-                                  widget.onChanged(value, originalIndex),
-                              deleteFunction: () =>
-                                  widget.onDelete(originalIndex),
-                              editFunction: () => widget.onEdit(originalIndex),
-                              isPinned: isPinned,
-                              onPin: () {
-                                widget.onPin(originalIndex, !isPinned);
-                                setState(() {});
-                                _scrollController.animateTo(
-                                  0.0,
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeOut,
-                                );
-                              },
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  PageRouteBuilder(
-                                    pageBuilder: (_, __, ___) => TaskDetailPage(
-                                        task: filteredList[index]),
-                                    transitionsBuilder:
-                                        (_, animation, __, child) {
-                                      const begin = Offset(0.0, 0.1);
-                                      const end = Offset.zero;
-                                      final slide =
-                                          Tween(begin: begin, end: end).chain(
-                                              CurveTween(
-                                                  curve: Curves.easeOut));
-                                      final fade = CurvedAnimation(
-                                          parent: animation,
-                                          curve: Curves.easeIn);
-
-                                      return SlideTransition(
-                                        position: animation.drive(slide),
-                                        child: FadeTransition(
-                                            opacity: fade, child: child),
-                                      );
-                                    },
-                                  ),
-                                );
-                              }),
+              ? ListView.builder(
+                  controller: _scrollController,
+                  scrollDirection: Axis.horizontal,
+                  itemCount: topTasks.length,
+                  itemBuilder: (context, index) {
+                    final originalIndex =
+                        widget.db.toDoList.indexOf(topTasks[index]);
+                    final isPinned = topTasks[index].length > 4 &&
+                        topTasks[index][4] == true;
+                    return SizedBox(
+                      width: 300,
+                      height: 200,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: ToDoTile(
+                          taskTitle: topTasks[index][0],
+                          taskContent: topTasks[index][1],
+                          taskDateTime: topTasks[index][2],
+                          taskCompleted: topTasks[index][3],
+                          onChanged: (value) =>
+                              widget.onChanged(value, originalIndex),
+                          deleteFunction: () =>
+                              widget.onDelete(originalIndex),
+                          editFunction: () => widget.onEdit(originalIndex),
+                          isPinned: isPinned,
+                          onPin: () {
+                            widget.onPin(originalIndex, !isPinned);
+                            setState(() {});
+                            _scrollController.animateTo(
+                              0.0,
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOut,
+                            );
+                          },
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              PageRouteBuilder(
+                                pageBuilder: (_, __, ___) =>
+                                    TaskDetailPage(task: topTasks[index]),
+                                transitionsBuilder: (_, animation, __, child) {
+                                  const begin = Offset(0.0, 0.1);
+                                  const end = Offset.zero;
+                                  final slide = Tween(begin: begin, end: end)
+                                      .chain(CurveTween(curve: Curves.easeOut));
+                                  final fade = CurvedAnimation(
+                                      parent: animation, curve: Curves.easeIn);
+                                  return SlideTransition(
+                                    position: animation.drive(slide),
+                                    child: FadeTransition(
+                                        opacity: fade, child: child),
+                                  );
+                                },
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 )
-              : Align(
-                  alignment: Alignment.topCenter,
-                  child: GridView.builder(
-                    controller: _scrollController,
-                    padding: EdgeInsets.zero,
-                    shrinkWrap: true,
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 8.0,
-                      mainAxisSpacing: 8.0,
-                      childAspectRatio: 2.5,
-                    ),
-                    itemCount: filteredList.length,
-                    itemBuilder: (context, index) {
-                      final originalIndex =
-                          widget.db.toDoList.indexOf(filteredList[index]);
-                      final isPinned = filteredList[index].length > 4 &&
-                          filteredList[index][4] == true;
-                      return ToDoTileShrinked(
-                        taskTitle: filteredList[index][0],
-                        taskDateTime: filteredList[index][2],
-                        taskCompleted: filteredList[index][3],
-                        onChanged: (value) =>
-                            widget.onChanged(value, originalIndex),
-                        deleteFunction: () => widget.onDelete(originalIndex),
-                        editFunction: () => widget.onEdit(originalIndex),
-                        isPinned: isPinned,
-                        onPin: () {
-                          widget.onPin(originalIndex, !isPinned);
-                          setState(() {});
-                          // Scroll to start after pin/unpin
-                          _scrollController.animateTo(
-                            0.0,
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeOut,
-                          );
-                        },
-                      );
-                    },
+              : GridView.builder(
+                  controller: _scrollController,
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 8.0,
+                    mainAxisSpacing: 8.0,
+                    childAspectRatio: 2.5,
                   ),
+                  itemCount: topTasks.length,
+                  itemBuilder: (context, index) {
+                    final originalIndex =
+                        widget.db.toDoList.indexOf(topTasks[index]);
+                    final isPinned = topTasks[index].length > 4 &&
+                        topTasks[index][4] == true;
+                    return ToDoTileShrinked(
+                      taskTitle: topTasks[index][0],
+                      taskDateTime: topTasks[index][2],
+                      taskCompleted: topTasks[index][3],
+                      onChanged: (value) =>
+                          widget.onChanged(value, originalIndex),
+                      deleteFunction: () => widget.onDelete(originalIndex),
+                      editFunction: () => widget.onEdit(originalIndex),
+                      isPinned: isPinned,
+                      onPin: () {
+                        widget.onPin(originalIndex, !isPinned);
+                        setState(() {});
+                        _scrollController.animateTo(
+                          0.0,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOut,
+                        );
+                      },
+                    );
+                  },
                 ),
         ),
       ],
     );
   }
 }
-
-
-// ListView.builder(
-//                   controller: _scrollController,
-//                   scrollDirection: Axis.horizontal,
-//                   itemCount: filteredList.length,
-//                   itemBuilder: (context, index) {
-//                     final originalIndex =
-//                         widget.db.toDoList.indexOf(filteredList[index]);
-//                     final isPinned = filteredList[index].length > 4 &&
-//                         filteredList[index][4] == true;
-//                     return SizedBox(
-//                       width: 300, // card width
-//                       height: 250, // collapsed card height
-//                       child: Padding(
-//                         padding: const EdgeInsets.all(8.0),
-//                         child: ToDoTile(
-//                           index: originalIndex, // needed for Hero tag
-//                           taskTitle: filteredList[index][0],
-//                           taskContent: filteredList[index][1],
-//                           taskDateTime: filteredList[index][2],
-//                           taskCompleted: filteredList[index][3],
-//                           onChanged: (value) =>
-//                               widget.onChanged(value, originalIndex),
-//                           deleteFunction: () => widget.onDelete(originalIndex),
-//                           editFunction: () => widget.onEdit(originalIndex),
-//                           isPinned: isPinned,
-//                           onPin: () {
-//                             widget.onPin(originalIndex, !isPinned);
-//                             setState(() {});
-//                             _scrollController.animateTo(
-//                               0.0,
-//                               duration: const Duration(milliseconds: 300),
-//                               curve: Curves.easeOut,
-//                             );
-//                           },
-//                         ),
-//                       ),
-//                     );
-//                   },
-//                 )
