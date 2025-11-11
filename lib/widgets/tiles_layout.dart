@@ -10,6 +10,7 @@ class TilesLayout extends StatefulWidget {
   final Function(int) onDelete;
   final Function(int) onEdit;
   final Function(int, bool) onPin;
+  final VoidCallback onTap;
 
   const TilesLayout({
     super.key,
@@ -18,6 +19,7 @@ class TilesLayout extends StatefulWidget {
     required this.onDelete,
     required this.onEdit,
     required this.onPin,
+    required this.onTap,
   });
 
   @override
@@ -49,8 +51,11 @@ class _TilesLayoutState extends State<TilesLayout> {
 
     // Sort due tasks by soonest date
     dueTasks.sort((a, b) {
-      final aDate = a[2] as DateTime;
-      final bDate = b[2] as DateTime;
+      final aDate = a[2] as DateTime?;
+      final bDate = b[2] as DateTime?;
+      if (aDate == null && bDate == null) return 0;
+      if (aDate == null) return 1;
+      if (bDate == null) return -1;
       return aDate.compareTo(bDate);
     });
 
@@ -111,37 +116,9 @@ class _TilesLayoutState extends State<TilesLayout> {
                         ),
                       ),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      _showSearch ? Icons.close : Icons.search,
-                      color: Colors.white,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () {
-                      setState(() {
-                        if (_showSearch) _searchQuery = '';
-                        _showSearch = !_showSearch;
-                      });
-                    },
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.grid_view,
-                      color: _showGridView ? Colors.green : Colors.white,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () {
-                      setState(() {
-                        _showGridView = !_showGridView;
-                      });
-                    },
-                  ),
-                ],
+              IconButton(
+                icon: const Icon(Icons.list, color: Colors.white),
+                onPressed: widget.onTap,
               ),
             ],
           ),

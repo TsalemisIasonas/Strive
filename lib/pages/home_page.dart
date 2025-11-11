@@ -6,6 +6,9 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../data/database.dart';
 import '../util/dialog_box.dart';
 import '../constants/colors.dart';
+import '../util/todo_tile.dart';
+import '../util/todo_tile_shrinked.dart';
+import '../pages/task_detail_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -19,6 +22,11 @@ class _HomePageState extends State<HomePage> {
   ToDoDataBase db = ToDoDataBase();
 
   int _selectedIndex = 0;
+
+  bool showAllTiles = false;
+  bool _showGridView = false;
+  bool _showSearch = false;
+  String _searchQuery = '';
 
   // New task fields
   String _newTitle = '';
@@ -42,6 +50,25 @@ class _HomePageState extends State<HomePage> {
         editUserName();
       });
     }
+  }
+
+  List filteredList({bool sortPinnedFirst = false}) {
+    List tasks = _searchQuery.isEmpty
+        ? db.toDoList
+        : db.toDoList.where((task) {
+            final title = task[0].toString().toLowerCase();
+            final content = task[1].toString().toLowerCase();
+            return title.contains(_searchQuery.toLowerCase()) ||
+                content.contains(_searchQuery.toLowerCase());
+          }).toList();
+    if (sortPinnedFirst) {
+      tasks.sort((a, b) {
+        final aPinned = a.length > 4 && a[4] == true ? 1 : 0;
+        final bPinned = b.length > 4 && b[4] == true ? 1 : 0;
+        return bPinned.compareTo(aPinned);
+      });
+    }
+    return tasks;
   }
 
   void editUserName() {
@@ -145,6 +172,11 @@ class _HomePageState extends State<HomePage> {
         });
         db.updateDataBase();
       },
+      onTap: () {
+        setState(() {
+          showAllTiles = !showAllTiles;
+        });
+      },
     );
   }
 
@@ -157,7 +189,7 @@ class _HomePageState extends State<HomePage> {
     final double height = MediaQuery.of(context).size.height;
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      extendBodyBehindAppBar: true,
+      extendBodyBehindAppBar: !showAllTiles,
       backgroundColor: backgroundColor,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: FloatingActionButton(
@@ -170,7 +202,8 @@ class _HomePageState extends State<HomePage> {
           size: 35,
         ),
       ),
-      appBar: AppBar(
+      appBar: !showAllTiles
+          ? AppBar(
         title: Text(
           db.userName != null
               ? "Hi, ${db.userName.toString()[0].toUpperCase() + db.userName.toString().substring(1)}"
@@ -213,8 +246,76 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         ],
-      ),
-      body: Column(
+      )
+          : AppBar(
+              title: _showSearch
+                  ? TextField(
+                      autofocus: true,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        hintText: 'Search tasks...',
+                        hintStyle: TextStyle(color: Colors.white54),
+                        border: InputBorder.none,
+                        contentPadding:
+                            EdgeInsets.symmetric(vertical: 0, horizontal: 0),
+                        isDense: true,
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
+                    )
+                  : Text(
+                      db.toDoList.isNotEmpty ? "My Tasks" : "Add a new task",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+              backgroundColor: darkGreen,
+              actions: [
+                IconButton(
+                  icon: Icon(
+                    _showSearch ? Icons.close : Icons.search,
+                    color: Colors.white,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () {
+                    setState(() {
+                      if (_showSearch) _searchQuery = '';
+                      _showSearch = !_showSearch;
+                    });
+                  },
+                ),
+                IconButton(
+                  icon: Icon(
+                    Icons.grid_view,
+                    color: _showGridView ? Colors.green : Colors.white,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () {
+                    setState(() {
+                      _showGridView = !_showGridView;
+                    });
+                  },
+                ),
+              ],
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () {
+                  setState(() {
+                    showAllTiles = false;
+                  });
+                },
+              ),
+            ),
+      body: !showAllTiles
+          ? Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
@@ -289,7 +390,116 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         ],
-      ),
+      )
+          : Container(
+              color: backgroundColor,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 0.0),
+                child: !_showGridView
+                    ? Builder(
+                        builder: (context) {
+                          final sortedTasks = filteredList(sortPinnedFirst: true);
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(16.0),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 16.0,
+                              mainAxisSpacing: 16.0,
+                              childAspectRatio: 0.75,
+                            ),
+                            itemCount: sortedTasks.length,
+                            itemBuilder: (context, index) {
+                              final task = sortedTasks[index];
+                              final isPinned = task.length > 4 && task[4] == true;
+                              return ToDoTile(
+                                taskTitle: task[0],
+                                taskContent: task[1],
+                                taskDateTime: task[2],
+                                taskCompleted: task[3],
+                                onChanged: (value) => checkBoxChanged(value, db.toDoList.indexOf(task)),
+                                deleteFunction: () => deleteTask(db.toDoList.indexOf(task)),
+                                editFunction: () => editTask(db.toDoList.indexOf(task)),
+                                isPinned: isPinned,
+                                onPin: () {
+                                  final idx = db.toDoList.indexOf(task);
+                                  setState(() {
+                                    if (idx != -1) {
+                                      while (db.toDoList[idx].length <= 4) {
+                                        db.toDoList[idx].add(false);
+                                      }
+                                      db.toDoList[idx][4] = !isPinned;
+                                      db.updateDataBase();
+                                    }
+                                  });
+                                },
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    PageRouteBuilder(
+                                      pageBuilder: (_, __, ___) => TaskDetailPage(task: task),
+                                      transitionsBuilder: (_, animation, __, child) {
+                                        const begin = Offset(0.0, 0.1);
+                                        const end = Offset.zero;
+                                        final slide = Tween(begin: begin, end: end)
+                                            .chain(CurveTween(curve: Curves.easeOut));
+                                        final fade = CurvedAnimation(
+                                            parent: animation, curve: Curves.easeIn);
+                                        return SlideTransition(
+                                          position: animation.drive(slide),
+                                          child: FadeTransition(opacity: fade, child: child),
+                                        );
+                                      },
+                                    ),
+                                  );
+                                },
+                                showPin: true,
+                              );
+                            },
+                          );
+                        },
+                      )
+                    : Builder(
+                        builder: (context) {
+                          final sortedTasks = filteredList(sortPinnedFirst: true);
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(5.0),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 4.0,
+                              mainAxisSpacing: 4.0,
+                              childAspectRatio: 3.5,
+                            ),
+                            itemCount: sortedTasks.length,
+                            itemBuilder: (context, index) {
+                              final task = sortedTasks[index];
+                              final isPinned = task.length > 4 && task[4] == true;
+                              return ToDoTileShrinked(
+                                taskTitle: task[0],
+                                taskDateTime: task[2],
+                                taskCompleted: task[3],
+                                onChanged: (value) => checkBoxChanged(value, db.toDoList.indexOf(task)),
+                                deleteFunction: () => deleteTask(db.toDoList.indexOf(task)),
+                                editFunction: () => editTask(db.toDoList.indexOf(task)),
+                                isPinned: isPinned,
+                                onPin: () {
+                                  final idx = db.toDoList.indexOf(task);
+                                  setState(() {
+                                    if (idx != -1) {
+                                      while (db.toDoList[idx].length <= 4) {
+                                        db.toDoList[idx].add(false);
+                                      }
+                                      db.toDoList[idx][4] = !isPinned;
+                                      db.updateDataBase();
+                                    }
+                                  });
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ),
       bottomNavigationBar: ClipRRect(
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(25),

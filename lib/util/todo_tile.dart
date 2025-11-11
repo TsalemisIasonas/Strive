@@ -12,6 +12,7 @@ class ToDoTile extends StatelessWidget {
   final VoidCallback editFunction;
   final VoidCallback onPin;
   final VoidCallback onTap;
+  final bool showPin;
 
   const ToDoTile({
     super.key,
@@ -25,6 +26,7 @@ class ToDoTile extends StatelessWidget {
     required this.isPinned,
     required this.onPin,
     required this.onTap,
+    this.showPin = true,
   });
 
   @override
@@ -88,14 +90,15 @@ class ToDoTile extends StatelessWidget {
                             ),
                           ),
                         ),
-                        IconButton(
-                          icon: Icon(
-                            isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                            color: Colors.white,
+                        if (showPin)
+                          IconButton(
+                            icon: Icon(
+                              isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                              color: Colors.white,
+                            ),
+                            tooltip: isPinned ? 'Unpin' : 'Pin',
+                            onPressed: onPin,
                           ),
-                          tooltip: isPinned ? 'Unpin' : 'Pin',
-                          onPressed: onPin,
-                        ),
                       ],
                     ),
                   ),

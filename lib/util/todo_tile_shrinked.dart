@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 class ToDoTileShrinked extends StatelessWidget {
   final String taskTitle;
-  final DateTime taskDateTime;
+  final DateTime? taskDateTime;
   final bool taskCompleted;
   final Function(bool?)? onChanged;
   final VoidCallback deleteFunction;
