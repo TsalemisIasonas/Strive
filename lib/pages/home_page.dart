@@ -525,7 +525,11 @@ class _HomePageState extends State<HomePage> {
                     _selectedIndex = 0;
                   });
                 },
-                icon: Icon(Icons.home, size: 35, color: navbarIconColor),
+                icon: Icon(
+                  Icons.home,
+                  size: 35,
+                  color: _selectedIndex == 0 ? Colors.green : navbarIconColor,
+                ),
               ),
               const Spacer(),
               IconButton(
@@ -537,7 +541,7 @@ class _HomePageState extends State<HomePage> {
                 icon: Icon(
                   Icons.bar_chart,
                   size: 35,
-                  color: navbarIconColor,
+                  color: _selectedIndex == 1 ? Colors.green : navbarIconColor,
                 ),
               ),
             ],

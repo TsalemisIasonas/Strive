@@ -131,13 +131,21 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                           style: const TextStyle(
                               fontSize: 16, color: Colors.white),
                         ),
+                        const SizedBox(height: 16),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16.0),
+                Container(
+                  padding: const EdgeInsets.only(top: 12.0, bottom: 16.0),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                        color: Colors.greenAccent,
+                        width: 2,
+                      ),
+                    ),
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -147,8 +155,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       ),
                       TextButton.icon(
                         style: TextButton.styleFrom(
-                          foregroundColor:
-                              _completed ? Colors.greenAccent : Colors.white,
+                          foregroundColor: _completed
+                              ? Colors.greenAccent
+                              : Colors.white,
                           backgroundColor: Colors.white10,
                         ),
                         onPressed: _toggleCompleted,
