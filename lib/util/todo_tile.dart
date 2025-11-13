@@ -61,16 +61,25 @@ class ToDoTile extends StatelessWidget {
                 children: [
                   Container(
                     height: 65,
-                    padding: const EdgeInsets.all(5),
+                    padding: const EdgeInsets.only(left: 12.0, right: 8.0),
                     color: tileHeaderColor,
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Checkbox(
-                          value: taskCompleted,
-                          onChanged: onChanged,
-                          activeColor: Colors.white,
-                          checkColor: Colors.black,
+                        Padding(
+                          padding: const EdgeInsets.only(right: 12.0),
+                          child: SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: Checkbox(
+                              value: taskCompleted,
+                              onChanged: onChanged,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              activeColor: Colors.white,
+                              checkColor: Colors.black,
+                            ),
+                          ),
                         ),
                         Expanded(
                           child: Text(
@@ -141,7 +150,39 @@ class ToDoTile extends StatelessWidget {
                     children: [
                       IconButton(
                         padding: EdgeInsets.zero,
-                        onPressed: deleteFunction,
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              backgroundColor: Colors.red.shade900,
+                              title: const Text(
+                                'Delete Task',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              content: const Text(
+                                'Are you sure you want to delete this task?',
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(),
+                                  child: const Text('Cancel',
+                                      style: TextStyle(color: Colors.white70)),
+                                ),
+                                TextButton(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  onPressed: () {
+                                    Navigator.of(ctx).pop();
+                                    deleteFunction();
+                                  },
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                         icon: const Icon(Icons.delete,
                             color: Colors.white, size: 25),
                       ),

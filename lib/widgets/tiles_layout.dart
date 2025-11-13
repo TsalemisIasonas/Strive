@@ -165,8 +165,12 @@ class _TilesLayoutState extends State<TilesLayout> {
                             Navigator.push(
                               context,
                               PageRouteBuilder(
-                                pageBuilder: (_, __, ___) =>
-                                    TaskDetailPage(task: topTasks[index]),
+                                pageBuilder: (_, __, ___) => TaskDetailPage(
+                                      task: topTasks[index],
+                                      onEdit: () => widget.onEdit(originalIndex),
+                                      onDelete: () => widget.onDelete(originalIndex),
+                                      onToggleComplete: (value) => widget.onChanged(value, originalIndex),
+                                    ),
                                 transitionsBuilder: (_, animation, __, child) {
                                   const begin = Offset(0.0, 0.1);
                                   const end = Offset.zero;

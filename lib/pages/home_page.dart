@@ -437,7 +437,13 @@ class _HomePageState extends State<HomePage> {
                                   Navigator.push(
                                     context,
                                     PageRouteBuilder(
-                                      pageBuilder: (_, __, ___) => TaskDetailPage(task: task),
+                                      pageBuilder: (_, __, ___) => TaskDetailPage(
+                                        task: task,
+                                        onEdit: () => editTask(db.toDoList.indexOf(task)),
+                                        onDelete: () => deleteTask(db.toDoList.indexOf(task)),
+                                        onToggleComplete: (value) =>
+                                            checkBoxChanged(value, db.toDoList.indexOf(task)),
+                                      ),
                                       transitionsBuilder: (_, animation, __, child) {
                                         const begin = Offset(0.0, 0.1);
                                         const end = Offset.zero;
