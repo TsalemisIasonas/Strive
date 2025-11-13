@@ -13,6 +13,7 @@ class ToDoTile extends StatelessWidget {
   final VoidCallback onPin;
   final VoidCallback onTap;
   final bool showPin;
+  final EdgeInsetsGeometry outerPadding;
 
   const ToDoTile({
     super.key,
@@ -27,12 +28,13 @@ class ToDoTile extends StatelessWidget {
     required this.onPin,
     required this.onTap,
     this.showPin = true,
+    this.outerPadding = const EdgeInsets.only(left: 10.0, right: 10.0, top: 10.0),
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 10.0, right: 10, top: 10),
+      padding: outerPadding,
       child: GestureDetector(
         onTap: onTap,
         child: Card(
@@ -45,8 +47,6 @@ class ToDoTile extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 300),
-              width: 300,
               decoration: BoxDecoration(
                 color: tileBackgroundColor,
                 borderRadius: BorderRadius.circular(12),
@@ -102,16 +102,16 @@ class ToDoTile extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 25, vertical: 10),
-                    child: Flexible(
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 25, vertical: 10),
                       child: Text(
                         taskContent.isNotEmpty
                             ? taskContent[0].toUpperCase() +
                                 taskContent.substring(1)
                             : '',
-                        maxLines: 5,
+                        maxLines: 7,
                         textAlign: TextAlign.center,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -122,7 +122,6 @@ class ToDoTile extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const Spacer(),
                   Text(
                     taskDateTime == null
                         ? ""

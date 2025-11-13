@@ -160,6 +160,7 @@ class _TilesLayoutState extends State<TilesLayout> {
                               curve: Curves.easeOut,
                             );
                           },
+                          showPin: false,
                           onTap: () {
                             Navigator.push(
                               context,

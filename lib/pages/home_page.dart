@@ -400,11 +400,11 @@ class _HomePageState extends State<HomePage> {
                         builder: (context) {
                           final sortedTasks = filteredList(sortPinnedFirst: true);
                           return GridView.builder(
-                            padding: const EdgeInsets.all(16.0),
+                            padding: EdgeInsets.zero,
                             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
-                              crossAxisSpacing: 16.0,
-                              mainAxisSpacing: 16.0,
+                              crossAxisSpacing: 0.0,
+                              mainAxisSpacing: 4.0,
                               childAspectRatio: 0.75,
                             ),
                             itemCount: sortedTasks.length,
@@ -420,6 +420,7 @@ class _HomePageState extends State<HomePage> {
                                 deleteFunction: () => deleteTask(db.toDoList.indexOf(task)),
                                 editFunction: () => editTask(db.toDoList.indexOf(task)),
                                 isPinned: isPinned,
+                                outerPadding: const EdgeInsets.only(left: 0, right: 0, top: 6),
                                 onPin: () {
                                   final idx = db.toDoList.indexOf(task);
                                   setState(() {
