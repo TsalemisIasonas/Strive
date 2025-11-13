@@ -38,7 +38,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.task[0];
+    final rawTitle = widget.task[0]?.toString() ?? '';
+    final title = rawTitle.isNotEmpty
+      ? rawTitle[0].toUpperCase() + rawTitle.substring(1)
+      : '';
     final content = widget.task[1];
     final dateTime = widget.task[2];
 

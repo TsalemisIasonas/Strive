@@ -105,9 +105,9 @@ class _TilesLayoutState extends State<TilesLayout> {
                         },
                       )
                     : Text(
-                        widget.db.toDoList.isNotEmpty
-                            ? "My Tasks"
-                            : "Add a new task",
+                      widget.db.toDoList.isNotEmpty
+                        ? "Upcoming tasks"
+                        : "Add a new task",
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
