@@ -170,7 +170,11 @@ class _ViewAllPageState extends State<ViewAllPage> {
                           isPinned: isPinned,
                           outerPadding:
                               const EdgeInsets.only(left: 0, right: 0, top: 6),
-                          onPin: () => widget.onPin(originalIndex, !isPinned),
+                          onPin: () {
+                            setState(() {
+                              widget.onPin(originalIndex, !isPinned);
+                            });
+                          },
                           onTap: () {
                             Navigator.push(
                               context,
@@ -241,7 +245,11 @@ class _ViewAllPageState extends State<ViewAllPage> {
                           editFunction: () =>
                               widget.onEdit(originalIndex),
                           isPinned: isPinned,
-                          onPin: () => widget.onPin(originalIndex, !isPinned),
+                          onPin: () {
+                            setState(() {
+                              widget.onPin(originalIndex, !isPinned);
+                            });
+                          },
                         );
                       },
                     );
