@@ -4,6 +4,7 @@ import 'package:assignments/data/database.dart';
 import 'package:assignments/util/todo_tile.dart';
 import 'package:assignments/util/todo_tile_shrinked.dart';
 import 'package:assignments/pages/task_detail_page.dart';
+import 'package:assignments/pages/task_edit_page.dart';
 
 class ViewAllPage extends StatefulWidget {
   final ToDoDataBase db;
@@ -58,7 +59,19 @@ class _ViewAllPageState extends State<ViewAllPage> {
       floatingActionButton: FloatingActionButton(
         shape: const CircleBorder(),
         onPressed: () {
-          Navigator.of(context).pop();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TaskEditPage(
+                onSave: (newTask) {
+                  setState(() {
+                    widget.db.toDoList.add(newTask);
+                    widget.db.updateDataBase();
+                  });
+                },
+              ),
+            ),
+          );
         },
         backgroundColor: Colors.white,
         child: const Icon(
