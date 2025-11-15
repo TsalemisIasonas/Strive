@@ -4,11 +4,11 @@ import 'package:assignments/widgets/tiles_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../data/database.dart';
-import '../util/dialog_box.dart';
 import '../constants/colors.dart';
 import '../util/todo_tile.dart';
 import '../util/todo_tile_shrinked.dart';
 import '../pages/task_detail_page.dart';
+import '../pages/task_edit_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -24,14 +24,10 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
   bool showAllTiles = false;
+  bool _previousShowAllTiles = false;
   bool _showGridView = false;
   bool _showSearch = false;
   String _searchQuery = '';
-
-  // New task fields
-  String _newTitle = '';
-  String _newContent = '';
-  DateTime? _newDateTime;
 
   final TextEditingController userNameController = TextEditingController();
 
@@ -89,32 +85,20 @@ class _HomePageState extends State<HomePage> {
     });
     db.updateDataBase();
   }
-
-  void saveNewTask() {
-    setState(() {
-      db.toDoList.add([
-        _newTitle,
-        _newContent,
-        _newDateTime,
-        false,
-      ]);
-    });
-    Navigator.of(context).pop();
-    db.updateDataBase();
-  }
-
+  
   void createNewTask() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return DialogBox(
-          onSave: saveNewTask,
-          onCancel: () => Navigator.of(context).pop(),
-          onChangedTitle: (value) => _newTitle = value,
-          onChangedContent: (value) => _newContent = value,
-          onDateTimePicked: (dateTime) => _newDateTime = dateTime,
-        );
-      },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TaskEditPage(
+          onSave: (newTask) {
+            setState(() {
+              db.toDoList.add(newTask);
+            });
+            db.updateDataBase();
+          },
+        ),
+      ),
     );
   }
 
@@ -126,32 +110,20 @@ class _HomePageState extends State<HomePage> {
   }
 
   void editTask(int index) {
-    String editedTitle = db.toDoList[index][0];
-    String editedContent = db.toDoList[index][1];
-    DateTime? editedDateTime = db.toDoList[index][2];
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return DialogBox(
-          initialTitle: editedTitle,
-          initialContent: editedContent,
-          initialDateTime: editedDateTime,
-          onChangedTitle: (value) => editedTitle = value,
-          onChangedContent: (value) => editedContent = value,
-          onDateTimePicked: (dateTime) => editedDateTime = dateTime,
-          onSave: () {
+    final existingTask = db.toDoList[index];
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TaskEditPage(
+          initialTask: List<dynamic>.from(existingTask),
+          onSave: (updatedTask) {
             setState(() {
-              db.toDoList[index][0] = editedTitle;
-              db.toDoList[index][1] = editedContent;
-              db.toDoList[index][2] = editedDateTime ?? DateTime.now();
+              db.toDoList[index] = updatedTask;
             });
             db.updateDataBase();
-            Navigator.of(context).pop();
           },
-          onCancel: () => Navigator.of(context).pop(),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -174,6 +146,7 @@ class _HomePageState extends State<HomePage> {
       },
       onTap: () {
         setState(() {
+          _previousShowAllTiles = showAllTiles;
           showAllTiles = !showAllTiles;
         });
       },
@@ -309,17 +282,60 @@ class _HomePageState extends State<HomePage> {
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () {
                   setState(() {
+                    _previousShowAllTiles = showAllTiles;
                     showAllTiles = false;
                   });
                 },
               ),
             ),
-      body: !showAllTiles
-          ? Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      body: ClipRect(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 800),
+          layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+            // Stack children so the outgoing one stays underneath and can be clipped.
+            return Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                ...previousChildren,
+                if (currentChild != null) currentChild,
+              ],
+            );
+          },
+          transitionBuilder: (Widget child, Animation<double> animation) {
+            // Separate curves for enter (slide) vs exit (fade) feel smoother.
+            final isEnteringViewAll = showAllTiles && !_previousShowAllTiles;
+
+            if (isEnteringViewAll) {
+              final slideCurve = CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              );
+              // Slide up the incoming view-all page, constrained to the viewport.
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.0, 0.9),
+                  end: Offset.zero,
+                ).animate(slideCurve),
+                child: SizedBox.expand(child: child),
+              );
+            } else {
+              final fadeCurve = CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeInOut,
+              );
+              return FadeTransition(
+                opacity: fadeCurve,
+                child: child,
+              );
+            }
+          },
+          child: !showAllTiles
+              ? Column(
+                  key: const ValueKey('home_view'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
           Container(
-            height: height * 0.45,
+            height: height * 0.42,
             width: double.infinity,
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -391,122 +407,153 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       )
-          : Container(
-              color: backgroundColor,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 0.0),
-                child: !_showGridView
-                    ? Builder(
-                        builder: (context) {
-                          final sortedTasks = filteredList(sortPinnedFirst: true);
-                          return GridView.builder(
-                            padding: EdgeInsets.zero,
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 0.0,
-                              mainAxisSpacing: 4.0,
-                              childAspectRatio: 0.75,
-                            ),
-                            itemCount: sortedTasks.length,
-                            itemBuilder: (context, index) {
-                              final task = sortedTasks[index];
-                              final isPinned = task.length > 4 && task[4] == true;
-                              return ToDoTile(
-                                taskTitle: task[0],
-                                taskContent: task[1],
-                                taskDateTime: task[2],
-                                taskCompleted: task[3],
-                                onChanged: (value) => checkBoxChanged(value, db.toDoList.indexOf(task)),
-                                deleteFunction: () => deleteTask(db.toDoList.indexOf(task)),
-                                editFunction: () => editTask(db.toDoList.indexOf(task)),
-                                isPinned: isPinned,
-                                outerPadding: const EdgeInsets.only(left: 0, right: 0, top: 6),
-                                onPin: () {
-                                  final idx = db.toDoList.indexOf(task);
-                                  setState(() {
-                                    if (idx != -1) {
-                                      while (db.toDoList[idx].length <= 4) {
-                                        db.toDoList[idx].add(false);
+              : Container(
+                  key: const ValueKey('view_all'),
+                  color: backgroundColor,
+                  child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 0.0),
+                  child: !_showGridView
+                      ? Builder(
+                          builder: (context) {
+                            final sortedTasks =
+                                filteredList(sortPinnedFirst: true);
+                            return GridView.builder(
+                              padding: EdgeInsets.zero,
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 0.0,
+                                mainAxisSpacing: 4.0,
+                                childAspectRatio: 0.75,
+                              ),
+                              itemCount: sortedTasks.length,
+                              itemBuilder: (context, index) {
+                                final task = sortedTasks[index];
+                                final isPinned =
+                                    task.length > 4 && task[4] == true;
+                                return ToDoTile(
+                                  taskTitle: task[0],
+                                  taskContent: task[1],
+                                  taskDateTime: task[2],
+                                  taskCompleted: task[3],
+                                  onChanged: (value) => checkBoxChanged(
+                                      value, db.toDoList.indexOf(task)),
+                                  deleteFunction: () => deleteTask(
+                                      db.toDoList.indexOf(task)),
+                                  editFunction: () => editTask(
+                                      db.toDoList.indexOf(task)),
+                                  isPinned: isPinned,
+                                  outerPadding: const EdgeInsets.only(
+                                      left: 0, right: 0, top: 6),
+                                  onPin: () {
+                                    final idx = db.toDoList.indexOf(task);
+                                    setState(() {
+                                      if (idx != -1) {
+                                        while (db.toDoList[idx].length <=
+                                            4) {
+                                          db.toDoList[idx].add(false);
+                                        }
+                                        db.toDoList[idx][4] = !isPinned;
+                                        db.updateDataBase();
                                       }
-                                      db.toDoList[idx][4] = !isPinned;
-                                      db.updateDataBase();
-                                    }
-                                  });
-                                },
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    PageRouteBuilder(
-                                      pageBuilder: (_, __, ___) => TaskDetailPage(
-                                        task: task,
-                                        onEdit: () => editTask(db.toDoList.indexOf(task)),
-                                        onDelete: () => deleteTask(db.toDoList.indexOf(task)),
-                                        onToggleComplete: (value) =>
-                                            checkBoxChanged(value, db.toDoList.indexOf(task)),
+                                    });
+                                  },
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      PageRouteBuilder(
+                                        pageBuilder: (_, __, ___) =>
+                                            TaskDetailPage(
+                                          task: task,
+                                          onEdit: () => editTask(db.toDoList
+                                              .indexOf(task)),
+                                          onDelete: () => deleteTask(
+                                              db.toDoList.indexOf(task)),
+                                          onToggleComplete: (value) =>
+                                              checkBoxChanged(
+                                                  value,
+                                                  db.toDoList.indexOf(
+                                                      task)),
+                                        ),
+                                        transitionsBuilder:
+                                            (_, animation, __, child) {
+                                          const begin = Offset(0.0, 0.1);
+                                          const end = Offset.zero;
+                                          final slide = Tween(
+                                                  begin: begin, end: end)
+                                              .chain(CurveTween(
+                                                  curve: Curves.easeOut));
+                                          final fade = CurvedAnimation(
+                                              parent: animation,
+                                              curve: Curves.easeIn);
+                                          return SlideTransition(
+                                            position:
+                                                animation.drive(slide),
+                                            child: FadeTransition(
+                                                opacity: fade,
+                                                child: child),
+                                          );
+                                        },
                                       ),
-                                      transitionsBuilder: (_, animation, __, child) {
-                                        const begin = Offset(0.0, 0.1);
-                                        const end = Offset.zero;
-                                        final slide = Tween(begin: begin, end: end)
-                                            .chain(CurveTween(curve: Curves.easeOut));
-                                        final fade = CurvedAnimation(
-                                            parent: animation, curve: Curves.easeIn);
-                                        return SlideTransition(
-                                          position: animation.drive(slide),
-                                          child: FadeTransition(opacity: fade, child: child),
-                                        );
-                                      },
-                                    ),
-                                  );
-                                },
-                                showPin: true,
-                              );
-                            },
-                          );
-                        },
-                      )
-                    : Builder(
-                        builder: (context) {
-                          final sortedTasks = filteredList(sortPinnedFirst: true);
-                          return GridView.builder(
-                            padding: const EdgeInsets.all(5.0),
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 4.0,
-                              mainAxisSpacing: 4.0,
-                              childAspectRatio: 3.5,
-                            ),
-                            itemCount: sortedTasks.length,
-                            itemBuilder: (context, index) {
-                              final task = sortedTasks[index];
-                              final isPinned = task.length > 4 && task[4] == true;
-                              return ToDoTileShrinked(
-                                taskTitle: task[0],
-                                taskDateTime: task[2],
-                                taskCompleted: task[3],
-                                onChanged: (value) => checkBoxChanged(value, db.toDoList.indexOf(task)),
-                                deleteFunction: () => deleteTask(db.toDoList.indexOf(task)),
-                                editFunction: () => editTask(db.toDoList.indexOf(task)),
-                                isPinned: isPinned,
-                                onPin: () {
-                                  final idx = db.toDoList.indexOf(task);
-                                  setState(() {
-                                    if (idx != -1) {
-                                      while (db.toDoList[idx].length <= 4) {
-                                        db.toDoList[idx].add(false);
+                                    );
+                                  },
+                                  showPin: true,
+                                );
+                              },
+                            );
+                          },
+                        )
+                      : Builder(
+                          builder: (context) {
+                            final sortedTasks =
+                                filteredList(sortPinnedFirst: true);
+                            return GridView.builder(
+                              padding: const EdgeInsets.all(5.0),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 4.0,
+                                mainAxisSpacing: 4.0,
+                                childAspectRatio: 3.5,
+                              ),
+                              itemCount: sortedTasks.length,
+                              itemBuilder: (context, index) {
+                                final task = sortedTasks[index];
+                                final isPinned =
+                                    task.length > 4 && task[4] == true;
+                                return ToDoTileShrinked(
+                                  taskTitle: task[0],
+                                  taskDateTime: task[2],
+                                  taskCompleted: task[3],
+                                  onChanged: (value) => checkBoxChanged(
+                                      value, db.toDoList.indexOf(task)),
+                                  deleteFunction: () => deleteTask(
+                                      db.toDoList.indexOf(task)),
+                                  editFunction: () => editTask(
+                                      db.toDoList.indexOf(task)),
+                                  isPinned: isPinned,
+                                  onPin: () {
+                                    final idx = db.toDoList.indexOf(task);
+                                    setState(() {
+                                      if (idx != -1) {
+                                        while (db.toDoList[idx].length <=
+                                            4) {
+                                          db.toDoList[idx].add(false);
+                                        }
+                                        db.toDoList[idx][4] = !isPinned;
+                                        db.updateDataBase();
                                       }
-                                      db.toDoList[idx][4] = !isPinned;
-                                      db.updateDataBase();
-                                    }
-                                  });
-                                },
-                              );
-                            },
-                          );
-                        },
-                      ),
+                                    });
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        ),
+                ),
               ),
-            ),
+        ),
+      ),
       bottomNavigationBar: ClipRRect(
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(25),
