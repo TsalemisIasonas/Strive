@@ -5,6 +5,7 @@ import 'package:assignments/util/todo_tile.dart';
 import 'package:assignments/util/todo_tile_shrinked.dart';
 import 'package:assignments/pages/task_detail_page.dart';
 import 'package:assignments/pages/task_edit_page.dart';
+import 'package:assignments/services/notification_service.dart';
 
 class ViewAllPage extends StatefulWidget {
   final ToDoDataBase db;
@@ -66,8 +67,19 @@ class _ViewAllPageState extends State<ViewAllPage> {
                 onSave: (newTask) {
                   setState(() {
                     widget.db.toDoList.add(newTask);
-                    widget.db.updateDataBase();
                   });
+                  widget.db.updateDataBase();
+
+                  final idx = widget.db.toDoList.length - 1;
+                  final reminder = newTask.length > 5 ? newTask[5] as DateTime? : null;
+                  if (reminder != null) {
+                    NotificationService().scheduleReminder(
+                      index: idx,
+                      title: (newTask[0] ?? '').toString(),
+                      body: (newTask[1] ?? '').toString(),
+                      scheduledTime: reminder,
+                    );
+                  }
                 },
               ),
             ),

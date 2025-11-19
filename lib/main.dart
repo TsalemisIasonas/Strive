@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'pages/home_page.dart';
 import '../constants/colors.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   // init the hive
@@ -10,6 +11,9 @@ void main() async {
   // open a box
   // ignore: unused_local_variable
   var box = await Hive.openBox('mybox');
+
+  // init notification service
+  await NotificationService().init();
 
   runApp(const MyApp());
 }

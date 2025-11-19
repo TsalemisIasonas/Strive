@@ -3,6 +3,7 @@ import 'package:assignments/widgets/my_chart.dart';
 import 'package:assignments/widgets/tiles_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:assignments/services/notification_service.dart';
 import '../data/database.dart';
 import '../constants/colors.dart';
 //import '../util/todo_tile.dart';
@@ -97,6 +98,17 @@ class _HomePageState extends State<HomePage> {
               db.toDoList.add(newTask);
             });
             db.updateDataBase();
+
+            final idx = db.toDoList.length - 1;
+            final reminder = newTask.length > 5 ? newTask[5] as DateTime? : null;
+            if (reminder != null) {
+              NotificationService().scheduleReminder(
+                index: idx,
+                title: (newTask[0] ?? '').toString(),
+                body: (newTask[1] ?? '').toString(),
+                scheduledTime: reminder,
+              );
+            }
           },
         ),
       ),
@@ -108,6 +120,8 @@ class _HomePageState extends State<HomePage> {
       db.toDoList.removeAt(index);
     });
     db.updateDataBase();
+
+    NotificationService().cancelReminder(index);
   }
 
   void editTask(int index) {
@@ -122,6 +136,18 @@ class _HomePageState extends State<HomePage> {
               db.toDoList[index] = updatedTask;
             });
             db.updateDataBase();
+
+            final reminder = updatedTask.length > 5 ? updatedTask[5] as DateTime? : null;
+            if (reminder != null) {
+              NotificationService().scheduleReminder(
+                index: index,
+                title: (updatedTask[0] ?? '').toString(),
+                body: (updatedTask[1] ?? '').toString(),
+                scheduledTime: reminder,
+              );
+            } else {
+              NotificationService().cancelReminder(index);
+            }
           },
         ),
       ),

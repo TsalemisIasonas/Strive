@@ -7,9 +7,9 @@ class ToDoDataBase {
 
   void createInitialData() {
     toDoList = [
-      ["Make Tutorial", "Learn how to make a to-do app", null, false],
-      ["Do Exercise", "30 min run", null, false],
-      ["Read Book", "Finish 10 pages of your novel", null, false],
+      ["Make Tutorial", "Learn how to make a to-do app", null, false, false, null],
+      ["Do Exercise", "30 min run", null, false, false, null],
+      ["Read Book", "Finish 10 pages of your novel", null, false, false, null],
     ];
     updateDataBase();
   }
@@ -23,21 +23,21 @@ class ToDoDataBase {
     }
 
     toDoList = rawList.map<List<dynamic>>((task) {
-      if (task is List && task.length == 4) {
-        return [
-          task[0],
-          task[1],
-          task[2], // can be null
-          task[3],
-        ];
-      } else if (task is List) {
-        final fixed = List<dynamic>.filled(4, null);
-        for (int i = 0; i < task.length && i < 4; i++) {
+      if (task is List) {
+        // Normalize to: [title, content, dueDate, completed, pinned, reminderDateTime]
+        final fixed = List<dynamic>.filled(6, null);
+        for (int i = 0; i < task.length && i < 6; i++) {
           fixed[i] = task[i];
         }
+
+        // Ensure completed defaults to false
+        fixed[3] = fixed[3] ?? false;
+        // Ensure pinned defaults to false
+        fixed[4] = fixed[4] ?? false;
+
         return fixed;
       } else {
-        return ["", "", null, false];
+        return ["", "", null, false, false, null];
       }
     }).toList();
   }

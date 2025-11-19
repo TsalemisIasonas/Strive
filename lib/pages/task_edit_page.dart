@@ -19,6 +19,7 @@ class _TaskEditPageState extends State<TaskEditPage> {
   late TextEditingController _titleController;
   late TextEditingController _contentController;
   DateTime? _selectedDateTime;
+  DateTime? _reminderDateTime;
 
   @override
   void initState() {
@@ -27,6 +28,7 @@ class _TaskEditPageState extends State<TaskEditPage> {
     _titleController = TextEditingController(text: task != null ? (task[0] ?? '').toString() : '');
     _contentController = TextEditingController(text: task != null ? (task[1] ?? '').toString() : '');
     _selectedDateTime = task != null ? task[2] as DateTime? : null;
+    _reminderDateTime = task != null && task.length > 5 ? task[5] as DateTime? : null;
   }
 
   @override
@@ -88,9 +90,16 @@ class _TaskEditPageState extends State<TaskEditPage> {
 
     final existing = widget.initialTask;
     final completed = existing != null && existing.length > 3 ? (existing[3] as bool? ?? false) : false;
-    final pinned = existing != null && existing.length > 4 ? existing[4] : false;
+    final pinned = existing != null && existing.length > 4 ? (existing[4] as bool? ?? false) : false;
 
-    final updatedTask = <dynamic>[title, content, _selectedDateTime, completed, pinned];
+    final updatedTask = <dynamic>[
+      title,
+      content,
+      _selectedDateTime,
+      completed,
+      pinned,
+      _reminderDateTime,
+    ];
     widget.onSave(updatedTask);
     Navigator.of(context).pop();
   }
@@ -170,6 +179,78 @@ class _TaskEditPageState extends State<TaskEditPage> {
                   onPressed: _pickDateTime,
                   icon: const Icon(Icons.calendar_today, color: Colors.white),
                   label: const Text('Pick date', style: TextStyle(color: Colors.white)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Reminder',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _reminderDateTime == null
+                          ? 'No reminder set'
+                          : '${_reminderDateTime!.day.toString().padLeft(2, '0')}/'
+                            '${_reminderDateTime!.month.toString().padLeft(2, '0')}/'
+                            '${_reminderDateTime!.year} '
+                            '${_reminderDateTime!.hour.toString().padLeft(2, '0')}:'
+                            '${_reminderDateTime!.minute.toString().padLeft(2, '0')}',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ],
+                ),
+                TextButton.icon(
+                  onPressed: () async {
+                    final now = DateTime.now();
+                    final base = _reminderDateTime ?? _selectedDateTime ?? now;
+
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: base,
+                      firstDate: DateTime(now.year - 1),
+                      lastDate: DateTime(now.year + 5),
+                      builder: (context, child) {
+                        return Theme(
+                          data: Theme.of(context).copyWith(
+                            colorScheme: const ColorScheme.dark(
+                              primary: Colors.green,
+                              onPrimary: Colors.white,
+                              surface: Colors.black,
+                              onSurface: Colors.white,
+                            ),
+                          ),
+                          child: child!,
+                        );
+                      },
+                    );
+
+                    if (date == null) return;
+
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(base),
+                    );
+
+                    setState(() {
+                      if (time == null) {
+                        _reminderDateTime = DateTime(date.year, date.month, date.day);
+                      } else {
+                        _reminderDateTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                      }
+                    });
+                  },
+                  icon: const Icon(Icons.notifications_active, color: Colors.white),
+                  label: const Text('Set reminder', style: TextStyle(color: Colors.white)),
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.white,
                   ),
