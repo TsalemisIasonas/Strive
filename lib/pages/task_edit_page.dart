@@ -20,6 +20,9 @@ class _TaskEditPageState extends State<TaskEditPage> {
   late TextEditingController _contentController;
   DateTime? _selectedDateTime;
   DateTime? _reminderDateTime;
+  bool _pinned = false;
+  final List<Map<String, dynamic>> _checklist = [];
+  bool _isChecklistNote = false;
 
   @override
   void initState() {
@@ -29,6 +32,30 @@ class _TaskEditPageState extends State<TaskEditPage> {
     _contentController = TextEditingController(text: task != null ? (task[1] ?? '').toString() : '');
     _selectedDateTime = task != null ? task[2] as DateTime? : null;
     _reminderDateTime = task != null && task.length > 5 ? task[5] as DateTime? : null;
+    _pinned = task != null && task.length > 4 ? (task[4] as bool? ?? false) : false;
+
+    if (task != null && task.length > 6 && task[6] is List) {
+      for (final item in (task[6] as List)) {
+        String text;
+        bool done;
+
+        if (item is Map<String, dynamic>) {
+          text = item['text']?.toString() ?? '';
+          done = item['done'] == true;
+        } else if (item is List && item.length >= 2) {
+          text = item[0]?.toString() ?? '';
+          done = item[1] == true;
+        } else {
+          continue;
+        }
+
+        _checklist.add({'text': text, 'done': done});
+      }
+      // Existing task that already has a checklist is a checklist note
+      if (_checklist.isNotEmpty) {
+        _isChecklistNote = true;
+      }
+    }
   }
 
   @override
@@ -83,22 +110,23 @@ class _TaskEditPageState extends State<TaskEditPage> {
   void _save() {
     final title = _titleController.text.trim();
     final content = _contentController.text.trim();
-    if (title.isEmpty && content.isEmpty) {
+
+    if (!_isChecklistNote && title.isEmpty && content.isEmpty) {
       Navigator.of(context).pop();
       return;
     }
 
     final existing = widget.initialTask;
     final completed = existing != null && existing.length > 3 ? (existing[3] as bool? ?? false) : false;
-    final pinned = existing != null && existing.length > 4 ? (existing[4] as bool? ?? false) : false;
 
     final updatedTask = <dynamic>[
       title,
-      content,
+      _isChecklistNote ? '' : content,
       _selectedDateTime,
       completed,
-      pinned,
+      _pinned,
       _reminderDateTime,
+      _isChecklistNote && _checklist.isNotEmpty ? _checklist : null,
     ];
     widget.onSave(updatedTask);
     Navigator.of(context).pop();
@@ -106,18 +134,29 @@ class _TaskEditPageState extends State<TaskEditPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isEditing = widget.initialTask != null;
-
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
         backgroundColor: darkGreen,
         iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
-          isEditing ? 'Edit Task' : 'New Task',
+          widget.initialTask != null ? 'Edit Task' : 'New Task',
           style: const TextStyle(color: Colors.white),
         ),
         actions: [
+          if (widget.initialTask != null)
+            IconButton(
+              icon: Icon(
+                _pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                color: Colors.white,
+              ),
+              tooltip: _pinned ? 'Unpin' : 'Pin',
+              onPressed: () {
+                setState(() {
+                  _pinned = !_pinned;
+                });
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.check),
             tooltip: 'Save',
@@ -141,15 +180,34 @@ class _TaskEditPageState extends State<TaskEditPage> {
             ),
             const SizedBox(height: 8),
             Expanded(
-              child: TextField(
-                controller: _contentController,
-                style: const TextStyle(color: Colors.white, fontSize: 18),
-                maxLines: null,
-                expands: true,
-                decoration: const InputDecoration(
-                  hintText: 'Write your task details here...',
-                  hintStyle: TextStyle(color: Colors.white54),
-                  border: InputBorder.none,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (!_isChecklistNote)
+                      TextField(
+                        controller: _contentController,
+                        style: const TextStyle(color: Colors.white, fontSize: 18),
+                        maxLines: null,
+                        decoration: const InputDecoration(
+                          hintText: 'Write your task details here...',
+                          hintStyle: TextStyle(color: Colors.white54),
+                          border: InputBorder.none,
+                        ),
+                      ),
+                    if (_isChecklistNote)
+                      _ChecklistEditor(
+                        items: _checklist,
+                        onChanged: (items) {
+                          setState(() {
+                            _checklist
+                              ..clear()
+                              ..addAll(items);
+                          });
+                        },
+                      ),
+                    const SizedBox(height: 8),
+                  ],
                 ),
               ),
             ),
@@ -260,6 +318,93 @@ class _TaskEditPageState extends State<TaskEditPage> {
           ],
         ),
       ),
+      floatingActionButton: null,
+    );
+  }
+}
+
+class _ChecklistEditor extends StatefulWidget {
+  final List<Map<String, dynamic>> items;
+  final ValueChanged<List<Map<String, dynamic>>> onChanged;
+
+  const _ChecklistEditor({
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  State<_ChecklistEditor> createState() => _ChecklistEditorState();
+}
+
+class _ChecklistEditorState extends State<_ChecklistEditor> {
+  void _updateItem(int index, Map<String, dynamic> newItem) {
+    final List<Map<String, dynamic>> updated = List<Map<String, dynamic>>.from(widget.items);
+    updated[index] = newItem;
+    widget.onChanged(updated);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      children: [
+        ...List.generate(widget.items.length, (index) {
+          final item = widget.items[index];
+          final controller = TextEditingController(text: item['text']?.toString() ?? '');
+
+          return Row(
+            children: [
+              Checkbox(
+                value: item['done'] == true,
+                activeColor: Colors.green,
+                onChanged: (value) {
+                  _updateItem(index, {
+                    'text': item['text']?.toString() ?? '',
+                    'done': value ?? false,
+                  });
+                },
+              ),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  decoration: const InputDecoration(
+                    hintText: 'Checklist item',
+                    hintStyle: TextStyle(color: Colors.white54),
+                    border: InputBorder.none,
+                  ),
+                  textInputAction: TextInputAction.done,
+                  minLines: 1,
+                  maxLines: 1,
+                  onChanged: (value) {
+                    _updateItem(index, {
+                      'text': value,
+                      'done': item['done'] == true,
+                    });
+                  },
+                  onSubmitted: (_) {
+                    if (index == widget.items.length - 1) {
+                      final updated = List<Map<String, dynamic>>.from(widget.items)
+                        ..add({'text': '', 'done': false});
+                      widget.onChanged(updated);
+                    }
+                  },
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white70, size: 18),
+                onPressed: () {
+                  final updated = List<Map<String, dynamic>>.from(widget.items)..removeAt(index);
+                  widget.onChanged(updated);
+                },
+              ),
+            ],
+          );
+        }),
+      ],
     );
   }
 }

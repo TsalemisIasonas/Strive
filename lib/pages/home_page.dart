@@ -6,9 +6,6 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:assignments/services/notification_service.dart';
 import '../data/database.dart';
 import '../constants/colors.dart';
-//import '../util/todo_tile.dart';
-//import '../util/todo_tile_shrinked.dart';
-//import '../pages/task_detail_page.dart';
 import '../pages/task_edit_page.dart';
 import '../pages/view_all_page.dart';
 
@@ -24,9 +21,11 @@ class _HomePageState extends State<HomePage> {
   ToDoDataBase db = ToDoDataBase();
 
   int _selectedIndex = 0;
+  
+  // State for the custom FAB expansion
+  bool _fabExpanded = false;
 
   bool showAllTiles = false;
-  //bool _previousShowAllTiles = false; // now unused but kept for compatibility
   bool _showGridView = false;
   bool _showSearch = false;
   String _searchQuery = '';
@@ -50,25 +49,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  List filteredList({bool sortPinnedFirst = false}) {
-    List tasks = _searchQuery.isEmpty
-        ? db.toDoList
-        : db.toDoList.where((task) {
-            final title = task[0].toString().toLowerCase();
-            final content = task[1].toString().toLowerCase();
-            return title.contains(_searchQuery.toLowerCase()) ||
-                content.contains(_searchQuery.toLowerCase());
-          }).toList();
-    if (sortPinnedFirst) {
-      tasks.sort((a, b) {
-        final aPinned = a.length > 4 && a[4] == true ? 1 : 0;
-        final bPinned = b.length > 4 && b[4] == true ? 1 : 0;
-        return bPinned.compareTo(aPinned);
-      });
-    }
-    return tasks;
-  }
-
   void editUserName() {
     showDialog(
       context: context,
@@ -87,12 +67,30 @@ class _HomePageState extends State<HomePage> {
     });
     db.updateDataBase();
   }
-  
-  void createNewTask() {
+
+  void _openTaskEditor({required bool checklist}) {
+    // Close the FAB menu before navigating
+    setState(() {
+      _fabExpanded = false;
+    });
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => TaskEditPage(
+          initialTask: checklist
+              ? [
+                  '',
+                  '',
+                  null,
+                  false,
+                  false,
+                  null,
+                  [
+                    {'text': '', 'done': false},
+                  ],
+                ]
+              : null,
           onSave: (newTask) {
             setState(() {
               db.toDoList.add(newTask);
@@ -100,7 +98,9 @@ class _HomePageState extends State<HomePage> {
             db.updateDataBase();
 
             final idx = db.toDoList.length - 1;
-            final reminder = newTask.length > 5 ? newTask[5] as DateTime? : null;
+            final reminder =
+                newTask.length > 5 ? newTask[5] as DateTime? : null;
+
             if (reminder != null) {
               NotificationService().scheduleReminder(
                 index: idx,
@@ -113,6 +113,10 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  void createNewTask() {
+    _openTaskEditor(checklist: false);
   }
 
   void deleteTask(int index) {
@@ -137,7 +141,9 @@ class _HomePageState extends State<HomePage> {
             });
             db.updateDataBase();
 
-            final reminder = updatedTask.length > 5 ? updatedTask[5] as DateTime? : null;
+            final reminder =
+                updatedTask.length > 5 ? updatedTask[5] as DateTime? : null;
+
             if (reminder != null) {
               NotificationService().scheduleReminder(
                 index: index,
@@ -162,7 +168,6 @@ class _HomePageState extends State<HomePage> {
       onEdit: editTask,
       onPin: (int index, bool pin) {
         setState(() {
-          // Ensure the 5th element exists for pin state
           if (db.toDoList[index].length < 5) {
             db.toDoList[index].add(pin);
           } else {
@@ -204,66 +209,72 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final double height = MediaQuery.of(context).size.height;
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       extendBodyBehindAppBar: !showAllTiles,
       backgroundColor: backgroundColor,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+
+      // ===============================================
+      // MAIN TOGGLE FAB (Fixed in Notch)
+      // ===============================================
       floatingActionButton: FloatingActionButton(
         shape: const CircleBorder(),
-        onPressed: createNewTask,
         backgroundColor: Colors.white,
-        child: const Icon(
-          Icons.add,
+        onPressed: () {
+          setState(() {
+            _fabExpanded = !_fabExpanded;
+          });
+        },
+        child: Icon(
+          _fabExpanded ? Icons.close : Icons.add,
           color: Colors.black,
           size: 35,
         ),
       ),
+
+      // ===============================================
+      // APP BAR
+      // ===============================================
       appBar: !showAllTiles
           ? AppBar(
-        title: Text(
-          db.userName != null
-              ? "Hi, ${db.userName.toString()[0].toUpperCase() + db.userName.toString().substring(1)}"
-              : "Welcome Back",
-          style: TextStyle(
-            color: textColor,
-            letterSpacing: 2,
-            fontSize: 35,
-            fontWeight: FontWeight.w300,
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        actions: [
-          PopupMenuButton<String>(
-            color: Colors.black,
-            icon: const Icon(Icons.settings, color: Colors.white),
-            onSelected: (value) {
-              if (value == 'Edit Username') {
-                editUserName();
-              }
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              const PopupMenuItem<String>(
-                value: 'Edit Username',
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                child: Text(
-                  'Edit Username',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
+              title: Text(
+                db.userName != null
+                    ? "Hi, ${db.userName.toString()[0].toUpperCase() + db.userName.toString().substring(1)}"
+                    : "Welcome Back",
+                style: TextStyle(
+                  color: textColor,
+                  letterSpacing: 2,
+                  fontSize: 35,
+                  fontWeight: FontWeight.w300,
                 ),
               ),
-              // const PopupMenuItem<String>( 
-              //   value: 'Delete',
-              //   // We'll apply the same padding here for a consistent look.
-              //   padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              //   child: Text(
-              //     'Delete Username',
-              //     style: TextStyle(color: Colors.white, fontSize: 16),
-              //   ),
-              // ),
-            ],
-          ),
-        ],
-      )
+              backgroundColor: Colors.transparent,
+              actions: [
+                PopupMenuButton<String>(
+                  color: Colors.black,
+                  icon: const Icon(Icons.settings, color: Colors.white),
+                  onSelected: (value) {
+                    if (value == 'Edit Username') {
+                      editUserName();
+                    }
+                  },
+                  itemBuilder: (BuildContext context) =>
+                      <PopupMenuEntry<String>>[
+                    const PopupMenuItem<String>(
+                      value: 'Edit Username',
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      child: Text(
+                        'Edit Username',
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            )
           : AppBar(
               title: _showSearch
                   ? TextField(
@@ -273,8 +284,6 @@ class _HomePageState extends State<HomePage> {
                         hintText: 'Search tasks...',
                         hintStyle: TextStyle(color: Colors.white54),
                         border: InputBorder.none,
-                        contentPadding:
-                            EdgeInsets.symmetric(vertical: 0, horizontal: 0),
                         isDense: true,
                       ),
                       onChanged: (value) {
@@ -299,8 +308,6 @@ class _HomePageState extends State<HomePage> {
                     _showSearch ? Icons.close : Icons.search,
                     color: Colors.white,
                   ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
                   onPressed: () {
                     setState(() {
                       if (_showSearch) _searchQuery = '';
@@ -313,8 +320,6 @@ class _HomePageState extends State<HomePage> {
                     Icons.grid_view,
                     color: _showGridView ? Colors.green : Colors.white,
                   ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
                   onPressed: () {
                     setState(() {
                       _showGridView = !_showGridView;
@@ -324,84 +329,146 @@ class _HomePageState extends State<HomePage> {
               ],
               leading: const SizedBox.shrink(),
             ),
-      body: ClipRect(
-        child: Column(
-          key: const ValueKey('home_view'),
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-          Container(
-            height: height * 0.42,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  lightGreen,
-                  darkGreen,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(20),
-                bottomRight: Radius.circular(20),
-                topLeft: Radius.circular(5),
-                topRight: Radius.circular(5),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: EdgeInsets.only(
-                    left: (AppBar().titleSpacing ?? 16.0) + 2.0,
-                    top: AppBar().preferredSize.height + 20.0,
-                  ),
-                  child: Text(
-                    db.toDoList.isNotEmpty
-                        ? "Completed: ${db.toDoList.where((task) => task.length > 3 && task[3] == true).length} "
-                            "out of ${db.toDoList.length} tasks"
-                        : "You haven't set any tasks",
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w300,
+
+      // ===============================================
+      // BODY (STACK)
+      // ===============================================
+      body: Stack(
+        children: [
+          // LAYER 1: The Main Content
+          Positioned.fill(
+            child: ClipRect(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // TOP HEADER / GRAPHIC
+                  Container(
+                    height: height * 0.42,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [lightGreen, darkGreen],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(20),
+                        bottomRight: Radius.circular(20),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.only(
+                            left: (AppBar().titleSpacing ?? 16.0) + 2.0,
+                            top: AppBar().preferredSize.height + 20.0,
+                          ),
+                          child: Text(
+                            db.toDoList.isNotEmpty
+                                ? "Completed: ${db.toDoList.where((task) => task.length > 3 && task[3] == true).length} "
+                                    "out of ${db.toDoList.length} tasks"
+                                : "You haven't set any tasks",
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w300,
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          height: height * 0.25,
+                          child: Center(
+                            child: Image.asset('assets/transparent_logo.png'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.3,
-                  child:
-                      Center(child: Image.asset('assets/transparent_logo.png')),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              transitionBuilder: (Widget child, Animation<double> animation) {
-                final offsetTween = Tween<Offset>(
-                  begin: _selectedIndex == 0
-                      ? const Offset(-1.0, 0.0)
-                      : const Offset(1.0, 0.0),
-                  end: Offset.zero,
-                );
-                return SlideTransition(
-                  position: animation.drive(offsetTween),
-                  child: child,
-                );
-              },
-              child: Container(
-                //key: ValueKey<int>(_selectedIndex),
-                color: backgroundColor, // Ensures background remains black
-                child: _selectedIndex == 0
-                    ? buildTasksLayout()
-                    : buildChartLayout(),
+
+                  // BODY LIST/CHART
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: Container(
+                        color: backgroundColor,
+                        child: _selectedIndex == 0
+                            ? buildTasksLayout()
+                            : buildChartLayout(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+
+          // LAYER 2: The Expanded FAB Buttons
+          // Renders on top of the content so it is tappable
+          if (_fabExpanded) ...[
+            // 2a. Invisible barrier to close menu when tapping outside
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () => setState(() => _fabExpanded = false),
+                behavior: HitTestBehavior.translucent,
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+
+            // 2b. The actual buttons
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                // [TWEAK] DISTANCE FROM BOTTOM
+                // Increase 'bottom' to move the whole group higher up.
+                padding: const EdgeInsets.only(bottom: 35), 
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    
+                    // TOP BUTTON (Checklist)
+                    Transform.translate(
+                      // [TWEAK] ANGLE/OFFSET
+                      // Change Offset(x, y). 
+                      // Example: Offset(-10, 0) moves it slightly Left.
+                      // Example: Offset(10, 0) moves it slightly Right.
+                      offset: const Offset(0, 0), 
+                      child: FloatingActionButton(
+                        heroTag: 'checklist',
+                        backgroundColor: Colors.white,
+                        onPressed: () => _openTaskEditor(checklist: true),
+                        child: const Icon(Icons.check_box,size: 40, color: Colors.black),
+                      ),
+                    ),
+                    
+                    // [TWEAK] DISTANCE BETWEEN BUTTONS
+                    const SizedBox(width: 30),
+
+                    // BOTTOM BUTTON (Notes)
+                    Transform.translate(
+                       // [TWEAK] ANGLE/OFFSET
+                      offset: const Offset(0, 0), 
+                      child: FloatingActionButton(
+                        heroTag: 'note',
+                        backgroundColor: Colors.white,
+                        onPressed: () => _openTaskEditor(checklist: false),
+                        child: const Icon(Icons.notes, size: 40,color: Colors.black),
+                      ),
+                    ),
+
+                    // [TWEAK] GAP BEFORE MAIN FAB
+                    const SizedBox(height: 50),
+                  ],
+                ),
+              ),
+            ),
+          ]
         ],
-      ),),
+      ),
+
+      // ===============================================
+      // BOTTOM NAV BAR
+      // ===============================================
       bottomNavigationBar: ClipRRect(
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(25),

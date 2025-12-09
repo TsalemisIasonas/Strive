@@ -213,6 +213,10 @@ class _ViewAllPageState extends State<ViewAllPage> {
                                   onToggleComplete: (value) =>
                                       widget.onChanged(
                                           value, originalIndex),
+                                  onTogglePin: (pin) {
+                                    widget.onPin(originalIndex, pin);
+                                    setState(() {});
+                                  },
                                 ),
                                 transitionsBuilder:
                                     (_, animation, __, child) {

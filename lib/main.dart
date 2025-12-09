@@ -5,6 +5,8 @@ import '../constants/colors.dart';
 import 'services/notification_service.dart';
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
   // init the hive
   await Hive.initFlutter();
 
@@ -12,8 +14,9 @@ void main() async {
   // ignore: unused_local_variable
   var box = await Hive.openBox('mybox');
 
-  // init notification service
+  // init notification service & ask permissions before any scheduling
   await NotificationService().init();
+  await NotificationService().askPermissionsAtStartup();
 
   runApp(const MyApp());
 }

@@ -24,9 +24,11 @@ class ToDoDataBase {
 
     toDoList = rawList.map<List<dynamic>>((task) {
       if (task is List) {
-        // Normalize to: [title, content, dueDate, completed, pinned, reminderDateTime]
-        final fixed = List<dynamic>.filled(6, null);
-        for (int i = 0; i < task.length && i < 6; i++) {
+        // Normalize to:
+        // [title, content, dueDate, completed, pinned, reminderDateTime, optionalChecklist]
+        // We keep index 6 (checklist) as-is if present, otherwise null.
+        final fixed = List<dynamic>.filled(7, null);
+        for (int i = 0; i < task.length && i < 7; i++) {
           fixed[i] = task[i];
         }
 
@@ -37,7 +39,7 @@ class ToDoDataBase {
 
         return fixed;
       } else {
-        return ["", "", null, false, false, null];
+        return ["", "", null, false, false, null, null];
       }
     }).toList();
   }

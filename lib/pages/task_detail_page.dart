@@ -6,6 +6,7 @@ class TaskDetailPage extends StatefulWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final ValueChanged<bool?> onToggleComplete;
+  final ValueChanged<bool>? onTogglePin;
 
   const TaskDetailPage({
     super.key,
@@ -13,6 +14,7 @@ class TaskDetailPage extends StatefulWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onToggleComplete,
+    this.onTogglePin,
   });
 
   @override
@@ -20,12 +22,14 @@ class TaskDetailPage extends StatefulWidget {
 }
 
 class _TaskDetailPageState extends State<TaskDetailPage> {
-  late bool _completed;
+  bool _completed = false;
+  bool _pinned = false;
 
   @override
   void initState() {
     super.initState();
     _completed = widget.task[3] as bool? ?? false;
+    _pinned = widget.task.length > 4 ? (widget.task[4] as bool? ?? false) : false;
   }
 
   void _toggleCompleted() {
@@ -36,6 +40,21 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     widget.onToggleComplete(newValue);
   }
 
+  void _togglePinned() {
+    setState(() {
+      _pinned = !_pinned;
+    });
+    // Update the underlying task structure so callers that read task[4]
+    // see the latest pinned value.
+    if (widget.task.length < 5) {
+      widget.task.add(_pinned);
+    } else {
+      widget.task[4] = _pinned;
+    }
+
+    widget.onTogglePin?.call(_pinned);
+  }
+
   @override
   Widget build(BuildContext context) {
     final rawTitle = widget.task[0]?.toString() ?? '';
@@ -44,6 +63,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       : '';
     final content = widget.task[1];
     final dateTime = widget.task[2];
+    final List<dynamic> checklist =
+        widget.task.length > 6 && widget.task[6] is List
+            ? (widget.task[6] as List)
+            : const [];
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -55,6 +78,13 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         backgroundColor: darkGreen,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
+          IconButton(
+            tooltip: _pinned ? 'Unpin Task' : 'Pin Task',
+            icon: Icon(
+              _pinned ? Icons.push_pin : Icons.push_pin_outlined,
+            ),
+            onPressed: _togglePinned,
+          ),
           IconButton(
             tooltip: 'Edit Task',
             icon: const Icon(Icons.edit),
@@ -124,6 +154,54 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                               fontSize: 18, color: Colors.white),
                         ),
                         const SizedBox(height: 16),
+                        if (checklist.isNotEmpty) ...[
+                          const Text(
+                            'Checklist',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ...checklist.map((rawItem) {
+                            String text = '';
+                            bool done = false;
+                            if (rawItem is Map) {
+                              text = rawItem['text']?.toString() ?? '';
+                              done = rawItem['done'] == true;
+                            } else if (rawItem is List && rawItem.length >= 2) {
+                              text = rawItem[0]?.toString() ?? '';
+                              done = rawItem[1] == true;
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2.0),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    done
+                                        ? Icons.check_box
+                                        : Icons.check_box_outline_blank,
+                                    color: done
+                                        ? Colors.greenAccent
+                                        : Colors.white70,
+                                    size: 22,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      text,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          const SizedBox(height: 16),
+                        ],
                         Text(
                           dateTime == null
                               ? 'Due: No due date set'

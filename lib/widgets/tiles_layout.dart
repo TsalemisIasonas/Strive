@@ -49,8 +49,14 @@ class _TilesLayoutState extends State<TilesLayout> {
             task[2] != null && (task[2] as DateTime).isAfter(now))
         .toList();
 
-    // Sort due tasks by soonest date
+    // Sort due tasks: pinned first, then by soonest date
     dueTasks.sort((a, b) {
+      final aPinned = a.length > 4 && a[4] == true ? 1 : 0;
+      final bPinned = b.length > 4 && b[4] == true ? 1 : 0;
+      if (aPinned != bPinned) {
+        return bPinned.compareTo(aPinned); // pinned first
+      }
+
       final aDate = a[2] as DateTime?;
       final bDate = b[2] as DateTime?;
       if (aDate == null && bDate == null) return 0;
@@ -62,12 +68,19 @@ class _TilesLayoutState extends State<TilesLayout> {
     // Take up to 4 from due tasks
     final topDue = dueTasks.take(4).toList();
 
-    // If less than 4, add tasks without due date or remaining tasks
+    // If less than 4, add remaining tasks (also pinned-first)
     if (topDue.length < 4) {
       final remaining = filteredList
           .where((task) => !topDue.contains(task))
-          .take(4 - topDue.length);
-      topDue.addAll(remaining);
+          .toList();
+
+      remaining.sort((a, b) {
+        final aPinned = a.length > 4 && a[4] == true ? 1 : 0;
+        final bPinned = b.length > 4 && b[4] == true ? 1 : 0;
+        return bPinned.compareTo(aPinned);
+      });
+
+      topDue.addAll(remaining.take(4 - topDue.length));
     }
 
     return topDue;
@@ -170,6 +183,10 @@ class _TilesLayoutState extends State<TilesLayout> {
                                       onEdit: () => widget.onEdit(originalIndex),
                                       onDelete: () => widget.onDelete(originalIndex),
                                       onToggleComplete: (value) => widget.onChanged(value, originalIndex),
+                                      onTogglePin: (pin) {
+                                        widget.onPin(originalIndex, pin);
+                                        setState(() {});
+                                      },
                                     ),
                                 transitionsBuilder: (_, animation, __, child) {
                                   const begin = Offset(0.0, 0.1);
