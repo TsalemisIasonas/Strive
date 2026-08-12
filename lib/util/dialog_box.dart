@@ -69,12 +69,28 @@ class _DialogBoxState extends State<DialogBox>
     );
 
     if (date != null) {
+      if (!mounted) return;
       final time = await showTimePicker(
         context: context,
         initialTime: selectedDateTime != null
             ? TimeOfDay.fromDateTime(selectedDateTime!)
             : TimeOfDay.now(),
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: Theme.of(context).colorScheme.copyWith(
+                tertiary: Colors.green,
+                onTertiary: Colors.white,
+                tertiaryContainer: Colors.green,
+                onTertiaryContainer: Colors.white,
+              ),
+            ),
+            child: child!,
+          );
+        },
       );
+
+      if (!mounted) return;
 
       if (time != null) {
         final combined = DateTime(

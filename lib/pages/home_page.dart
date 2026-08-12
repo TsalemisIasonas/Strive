@@ -2,12 +2,14 @@ import 'package:assignments/util/username_dialog_box.dart';
 import 'package:assignments/widgets/my_chart.dart';
 import 'package:assignments/widgets/tiles_layout.dart';
 import 'package:flutter/material.dart';
+import 'package:animations/animations.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:assignments/services/notification_service.dart';
 import '../data/database.dart';
 import '../constants/colors.dart';
 import '../pages/task_edit_page.dart';
 import '../pages/view_all_page.dart';
+import 'package:assignments/util/route_transitions.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -23,12 +25,11 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   
   // State for the custom FAB expansion
-  bool _fabExpanded = false;
+
 
   bool showAllTiles = false;
   bool _showGridView = false;
   bool _showSearch = false;
-  String _searchQuery = '';
 
   final TextEditingController userNameController = TextEditingController();
 
@@ -63,34 +64,24 @@ class _HomePageState extends State<HomePage> {
 
   void checkBoxChanged(bool? value, int index) {
     setState(() {
-      db.toDoList[index][3] = value ?? false;
+      final isCompleted = value ?? false;
+      db.toDoList[index][3] = isCompleted;
+      
+      // Auto-unpin if the task is marked as completed
+      if (isCompleted && db.toDoList[index].length > 4) {
+        db.toDoList[index][4] = false;
+      }
     });
     db.updateDataBase();
   }
 
-  void _openTaskEditor({required bool checklist}) {
-    // Close the FAB menu before navigating
-    setState(() {
-      _fabExpanded = false;
-    });
-
+  void _openTaskEditor() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => TaskEditPage(
-          initialTask: checklist
-              ? [
-                  '',
-                  '',
-                  null,
-                  false,
-                  false,
-                  null,
-                  [
-                    {'text': '', 'done': false},
-                  ],
-                ]
-              : null,
+      createSmoothTransitionRoute(
+        TaskEditPage(
+          initialTask: null,
+
           onSave: (newTask) {
             setState(() {
               db.toDoList.add(newTask);
@@ -116,7 +107,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void createNewTask() {
-    _openTaskEditor(checklist: false);
+    _openTaskEditor();
   }
 
   void deleteTask(int index) {
@@ -128,16 +119,18 @@ class _HomePageState extends State<HomePage> {
     NotificationService().cancelReminder(index);
   }
 
-  void editTask(int index) {
+  Future<void> editTask(int index) async {
     final existingTask = db.toDoList[index];
-    Navigator.push(
+    await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => TaskEditPage(
+      createSmoothTransitionRoute(
+        TaskEditPage(
           initialTask: List<dynamic>.from(existingTask),
           onSave: (updatedTask) {
             setState(() {
-              db.toDoList[index] = updatedTask;
+              existingTask.clear();
+              existingTask.addAll(updatedTask);
+              db.toDoList[index] = existingTask;
             });
             db.updateDataBase();
 
@@ -176,11 +169,11 @@ class _HomePageState extends State<HomePage> {
         });
         db.updateDataBase();
       },
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        await Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => ViewAllPage(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => ViewAllPage(
               db: db,
               onChanged: checkBoxChanged,
               onDelete: deleteTask,
@@ -196,6 +189,15 @@ class _HomePageState extends State<HomePage> {
                 db.updateDataBase();
               },
             ),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return SharedAxisTransition(
+                animation: animation,
+                secondaryAnimation: secondaryAnimation,
+                transitionType: SharedAxisTransitionType.scaled,
+                fillColor: Colors.transparent,
+                child: child,
+              );
+            },
           ),
         );
       },
@@ -222,13 +224,9 @@ class _HomePageState extends State<HomePage> {
       floatingActionButton: FloatingActionButton(
         shape: const CircleBorder(),
         backgroundColor: Colors.white,
-        onPressed: () {
-          setState(() {
-            _fabExpanded = !_fabExpanded;
-          });
-        },
-        child: Icon(
-          _fabExpanded ? Icons.close : Icons.add,
+        onPressed: _openTaskEditor,
+        child: const Icon(
+          Icons.add,
           color: Colors.black,
           size: 35,
         ),
@@ -287,9 +285,6 @@ class _HomePageState extends State<HomePage> {
                         isDense: true,
                       ),
                       onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
                       },
                     )
                   : Text(
@@ -310,7 +305,6 @@ class _HomePageState extends State<HomePage> {
                   ),
                   onPressed: () {
                     setState(() {
-                      if (_showSearch) _searchQuery = '';
                       _showSearch = !_showSearch;
                     });
                   },
@@ -361,8 +355,8 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         Padding(
                           padding: EdgeInsets.only(
-                            left: (AppBar().titleSpacing ?? 16.0) + 2.0,
-                            top: AppBar().preferredSize.height + 20.0,
+                            left: (AppBar().titleSpacing ?? 16.0) + 8.0,
+                            top: AppBar().preferredSize.height + 28.0,
                           ),
                           child: Text(
                             db.toDoList.isNotEmpty
@@ -388,13 +382,27 @@ class _HomePageState extends State<HomePage> {
 
                   // BODY LIST/CHART
                   Expanded(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      child: Container(
-                        color: backgroundColor,
+                    child: Container(
+                      color: backgroundColor,
+                      child: PageTransitionSwitcher(
+                        duration: const Duration(milliseconds: 400),
+                        transitionBuilder: (child, animation, secondaryAnimation) {
+                          return FadeThroughTransition(
+                            animation: animation,
+                            secondaryAnimation: secondaryAnimation,
+                            fillColor: Colors.transparent,
+                            child: child,
+                          );
+                        },
                         child: _selectedIndex == 0
-                            ? buildTasksLayout()
-                            : buildChartLayout(),
+                            ? KeyedSubtree(
+                                key: const ValueKey('tasksLayout'),
+                                child: buildTasksLayout(),
+                              )
+                            : KeyedSubtree(
+                                key: const ValueKey('chartLayout'),
+                                child: buildChartLayout(),
+                              ),
                       ),
                     ),
                   ),
@@ -403,110 +411,53 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
-          // LAYER 2: The Expanded FAB Buttons
-          // Renders on top of the content so it is tappable
-          if (_fabExpanded) ...[
-            // 2a. Invisible barrier to close menu when tapping outside
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: () => setState(() => _fabExpanded = false),
-                behavior: HitTestBehavior.translucent,
-                child: Container(color: Colors.transparent),
-              ),
-            ),
 
-            // 2b. The actual buttons
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                // [TWEAK] DISTANCE FROM BOTTOM
-                // Increase 'bottom' to move the whole group higher up.
-                padding: const EdgeInsets.only(bottom: 35), 
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    
-                    // TOP BUTTON (Checklist)
-                    Transform.translate(
-                      // [TWEAK] ANGLE/OFFSET
-                      // Change Offset(x, y). 
-                      // Example: Offset(-10, 0) moves it slightly Left.
-                      // Example: Offset(10, 0) moves it slightly Right.
-                      offset: const Offset(0, 0), 
-                      child: FloatingActionButton(
-                        heroTag: 'checklist',
-                        backgroundColor: Colors.white,
-                        onPressed: () => _openTaskEditor(checklist: true),
-                        child: const Icon(Icons.check_box,size: 40, color: Colors.black),
-                      ),
-                    ),
-                    
-                    // [TWEAK] DISTANCE BETWEEN BUTTONS
-                    const SizedBox(width: 30),
-
-                    // BOTTOM BUTTON (Notes)
-                    Transform.translate(
-                       // [TWEAK] ANGLE/OFFSET
-                      offset: const Offset(0, 0), 
-                      child: FloatingActionButton(
-                        heroTag: 'note',
-                        backgroundColor: Colors.white,
-                        onPressed: () => _openTaskEditor(checklist: false),
-                        child: const Icon(Icons.notes, size: 40,color: Colors.black),
-                      ),
-                    ),
-
-                    // [TWEAK] GAP BEFORE MAIN FAB
-                    const SizedBox(height: 50),
-                  ],
-                ),
-              ),
-            ),
-          ]
         ],
       ),
 
       // ===============================================
       // BOTTOM NAV BAR
       // ===============================================
-      bottomNavigationBar: ClipRRect(
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(25),
-          topRight: Radius.circular(25),
-        ),
-        child: BottomAppBar(
-          padding: const EdgeInsets.only(left: 40, right: 40),
-          height: 75,
-          shape: const CircularNotchedRectangle(),
-          color: navbarColor,
-          child: Row(
-            children: [
-              IconButton(
-                onPressed: () {
-                  setState(() {
-                    _selectedIndex = 0;
-                  });
-                },
-                icon: Icon(
-                  Icons.home,
-                  size: 35,
-                  color: _selectedIndex == 0 ? Colors.green : navbarIconColor,
+      bottomNavigationBar: SafeArea(
+        child: ClipRRect(
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(25),
+            topRight: Radius.circular(25),
+          ),
+          child: BottomAppBar(
+            padding: const EdgeInsets.only(left: 40, right: 40),
+            height: 75,
+            shape: const CircularNotchedRectangle(),
+            color: navbarColor,
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedIndex = 0;
+                    });
+                  },
+                  icon: Icon(
+                    Icons.home,
+                    size: 35,
+                    color: _selectedIndex == 0 ? Colors.green : navbarIconColor,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              IconButton(
-                onPressed: () {
-                  setState(() {
-                    _selectedIndex = 1;
-                  });
-                },
-                icon: Icon(
-                  Icons.bar_chart,
-                  size: 35,
-                  color: _selectedIndex == 1 ? Colors.green : navbarIconColor,
+                const Spacer(),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedIndex = 1;
+                    });
+                  },
+                  icon: Icon(
+                    Icons.bar_chart,
+                    size: 35,
+                    color: _selectedIndex == 1 ? Colors.green : navbarIconColor,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

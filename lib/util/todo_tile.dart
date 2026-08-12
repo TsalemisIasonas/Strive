@@ -56,7 +56,7 @@ class ToDoTile extends StatelessWidget {
                 ),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   Container(
@@ -114,88 +114,131 @@ class ToDoTile extends StatelessWidget {
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 25, vertical: 10),
-                      child: Text(
-                        taskContent.isNotEmpty
-                            ? taskContent[0].toUpperCase() +
-                                taskContent.substring(1)
-                            : '',
-                        maxLines: 7,
-                        textAlign: TextAlign.center,
+                          horizontal: 16, vertical: 10),
+                      child: RichText(
+                        maxLines: 4,
+                        textAlign: TextAlign.left,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: taskCompleted ? lightGreen : textColor,
-                          fontWeight: FontWeight.w400,
+                        text: TextSpan(
+                          children: (() {
+                            if (taskContent.isEmpty) return const <TextSpan>[];
+                            String text = taskContent[0].toUpperCase() + taskContent.substring(1);
+                            final lines = text.split('\n');
+                            final spans = <TextSpan>[];
+                            bool wasChecklist = lines.isNotEmpty && (lines[0].startsWith('✓') || lines[0].startsWith('•'));
+                            
+                            for (int i = 0; i < lines.length; i++) {
+                              final line = lines[i];
+                              bool isChecklist = line.startsWith('✓') || line.startsWith('•');
+                              
+                              if (i > 0) {
+                                if (isChecklist != wasChecklist) {
+                                  spans.add(const TextSpan(text: '\n\n', style: TextStyle(fontSize: 6)));
+                                } else {
+                                  spans.add(const TextSpan(text: '\n'));
+                                }
+                              }
+                              wasChecklist = isChecklist;
+
+                              if (line.startsWith('✓')) {
+                                spans.add(TextSpan(
+                                  text: line,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.greenAccent,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ));
+                              } else {
+                                spans.add(TextSpan(
+                                  text: line,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: taskCompleted ? lightGreen : textColor,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ));
+                              }
+                            }
+                            return spans;
+                          })(),
                         ),
                       ),
                     ),
                   ),
-                  Text(
-                    taskDateTime == null
-                        ? ""
-                        : "Due Date: "
-                            "${taskDateTime!.day.toString().padLeft(2, '0')}/"
-                            "${taskDateTime!.month.toString().padLeft(2, '0')}/"
-                            "${taskDateTime!.year}",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white54,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w300,
+                  Padding(
+                    padding: const EdgeInsets.only(left: 16, bottom: 10),
+                    child: Text(
+                      taskDateTime == null
+                          ? ""
+                          : "Due Date: "
+                              "${taskDateTime!.day.toString().padLeft(2, '0')}/"
+                              "${taskDateTime!.month.toString().padLeft(2, '0')}/"
+                              "${taskDateTime!.year}",
+                      textAlign: TextAlign.left,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w300,
+                      ),
                     ),
                   ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              backgroundColor: Colors.red.shade900,
-                              title: const Text(
-                                'Delete Task',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                              content: const Text(
-                                'Are you sure you want to delete this task?',
-                                style: TextStyle(color: Colors.white70),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.of(ctx).pop(),
-                                  child: const Text('Cancel',
-                                      style: TextStyle(color: Colors.white70)),
+                  SizedBox(
+                    height: 36,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: Colors.red.shade900,
+                                title: const Text(
+                                  'Delete Task',
+                                  style: TextStyle(color: Colors.white),
                                 ),
-                                TextButton(
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: Colors.white,
+                                content: const Text(
+                                  'Are you sure you want to delete this task?',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(ctx).pop(),
+                                    child: const Text('Cancel',
+                                        style: TextStyle(color: Colors.white70)),
                                   ),
-                                  onPressed: () {
-                                    Navigator.of(ctx).pop();
-                                    deleteFunction();
-                                  },
-                                  child: const Text('Delete'),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.delete,
-                            color: Colors.white, size: 25),
-                      ),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: editFunction,
-                        icon: const Icon(Icons.edit,
-                            color: Colors.white, size: 25),
-                      ),
-                    ],
+                                  TextButton(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    onPressed: () {
+                                      Navigator.of(ctx).pop();
+                                      deleteFunction();
+                                    },
+                                    child: const Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.delete,
+                              color: Colors.white, size: 22),
+                        ),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
+                          onPressed: editFunction,
+                          icon: const Icon(Icons.edit,
+                              color: Colors.white, size: 22),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-              ),
+              )
             ),
           ),
         ),

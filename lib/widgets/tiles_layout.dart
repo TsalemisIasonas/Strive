@@ -3,6 +3,7 @@ import '../util/todo_tile.dart';
 import '../util/todo_tile_shrinked.dart';
 import 'package:flutter/material.dart';
 import '../pages/task_detail_page.dart';
+import 'package:assignments/util/route_transitions.dart';
 
 class TilesLayout extends StatefulWidget {
   final ToDoDataBase db;
@@ -10,7 +11,7 @@ class TilesLayout extends StatefulWidget {
   final Function(int) onDelete;
   final Function(int) onEdit;
   final Function(int, bool) onPin;
-  final VoidCallback onTap;
+  final Future<void> Function() onTap;
 
   const TilesLayout({
     super.key,
@@ -27,13 +28,12 @@ class TilesLayout extends StatefulWidget {
 }
 
 class _TilesLayoutState extends State<TilesLayout> {
-  bool _showGridView = false;
-  bool _showSearch = false;
+  final bool _showGridView = false;
+  final bool _showSearch = false;
   String _searchQuery = '';
   final ScrollController _scrollController = ScrollController();
 
   List<List<dynamic>> _getTop4Tasks() {
-    final now = DateTime.now();
     final filteredList = _searchQuery.isEmpty
         ? widget.db.toDoList
         : widget.db.toDoList.where((task) {
@@ -43,47 +43,30 @@ class _TilesLayoutState extends State<TilesLayout> {
                 content.contains(_searchQuery.toLowerCase());
           }).toList();
 
-    // Separate tasks with a due date in the future (or immediate)
-    final dueTasks = filteredList
-        .where((task) =>
-            task[2] != null && (task[2] as DateTime).isAfter(now))
+    // Get all pinned tasks
+    final pinnedTasks = filteredList
+        .where((task) => task.length > 4 && task[4] == true)
+        .toList()
+        .reversed
         .toList();
 
-    // Sort due tasks: pinned first, then by soonest date
-    dueTasks.sort((a, b) {
-      final aPinned = a.length > 4 && a[4] == true ? 1 : 0;
-      final bPinned = b.length > 4 && b[4] == true ? 1 : 0;
-      if (aPinned != bPinned) {
-        return bPinned.compareTo(aPinned); // pinned first
-      }
+    // Get remaining unpinned tasks, reversed so the most recently added are first
+    final unpinnedTasks = filteredList
+        .where((task) => !(task.length > 4 && task[4] == true))
+        .toList()
+        .reversed
+        .toList();
 
-      final aDate = a[2] as DateTime?;
-      final bDate = b[2] as DateTime?;
-      if (aDate == null && bDate == null) return 0;
-      if (aDate == null) return 1;
-      if (bDate == null) return -1;
-      return aDate.compareTo(bDate);
+    // Push completed unpinned tasks to the bottom
+    unpinnedTasks.sort((a, b) {
+      final aCompleted = a.length > 3 && a[3] == true ? 1 : 0;
+      final bCompleted = b.length > 3 && b[3] == true ? 1 : 0;
+      return aCompleted.compareTo(bCompleted);
     });
 
-    // Take up to 4 from due tasks
-    final topDue = dueTasks.take(4).toList();
-
-    // If less than 4, add remaining tasks (also pinned-first)
-    if (topDue.length < 4) {
-      final remaining = filteredList
-          .where((task) => !topDue.contains(task))
-          .toList();
-
-      remaining.sort((a, b) {
-        final aPinned = a.length > 4 && a[4] == true ? 1 : 0;
-        final bPinned = b.length > 4 && b[4] == true ? 1 : 0;
-        return bPinned.compareTo(aPinned);
-      });
-
-      topDue.addAll(remaining.take(4 - topDue.length));
-    }
-
-    return topDue;
+    // Combine and take up to 4 tasks
+    final combined = [...pinnedTasks, ...unpinnedTasks];
+    return combined.take(4).toList();
   }
 
   @override
@@ -131,7 +114,16 @@ class _TilesLayoutState extends State<TilesLayout> {
               ),
               IconButton(
                 icon: const Icon(Icons.list, color: Colors.white),
-                onPressed: widget.onTap,
+                onPressed: () async {
+                  await widget.onTap();
+                  if (mounted) {
+                    _scrollController.animateTo(
+                      0.0,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOut,
+                    );
+                  }
+                },
               ),
             ],
           ),
@@ -173,36 +165,35 @@ class _TilesLayoutState extends State<TilesLayout> {
                               curve: Curves.easeOut,
                             );
                           },
-                          showPin: false,
-                          onTap: () {
-                            Navigator.push(
+                          showPin: true,
+                          onTap: () async {
+                            await Navigator.push(
                               context,
-                              PageRouteBuilder(
-                                pageBuilder: (_, __, ___) => TaskDetailPage(
-                                      task: topTasks[index],
-                                      onEdit: () => widget.onEdit(originalIndex),
-                                      onDelete: () => widget.onDelete(originalIndex),
-                                      onToggleComplete: (value) => widget.onChanged(value, originalIndex),
-                                      onTogglePin: (pin) {
-                                        widget.onPin(originalIndex, pin);
-                                        setState(() {});
-                                      },
-                                    ),
-                                transitionsBuilder: (_, animation, __, child) {
-                                  const begin = Offset(0.0, 0.1);
-                                  const end = Offset.zero;
-                                  final slide = Tween(begin: begin, end: end)
-                                      .chain(CurveTween(curve: Curves.easeOut));
-                                  final fade = CurvedAnimation(
-                                      parent: animation, curve: Curves.easeIn);
-                                  return SlideTransition(
-                                    position: animation.drive(slide),
-                                    child: FadeTransition(
-                                        opacity: fade, child: child),
-                                  );
-                                },
+                              createSmoothTransitionRoute(
+                                TaskDetailPage(
+                                  task: topTasks[index],
+                                  onEdit: () => widget.onEdit(originalIndex),
+                                  onDelete: () => widget.onDelete(originalIndex),
+                                  onToggleComplete: (value) => widget.onChanged(value, originalIndex),
+                                  onTogglePin: (pin) {
+                                    widget.onPin(originalIndex, pin);
+                                    setState(() {});
+                                  },
+                                  onTaskUpdated: () {
+                                    widget.db.updateDataBase();
+                                    setState(() {});
+                                  },
+                                ),
                               ),
                             );
+                            if (mounted) {
+                              setState(() {});
+                              _scrollController.animateTo(
+                                0.0,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeOut,
+                              );
+                            }
                           },
                         ),
                       ),

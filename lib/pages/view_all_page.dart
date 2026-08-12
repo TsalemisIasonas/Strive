@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:assignments/constants/colors.dart';
 import 'package:assignments/data/database.dart';
-import 'package:assignments/util/todo_tile.dart';
-import 'package:assignments/util/todo_tile_shrinked.dart';
+
+import 'package:assignments/util/todo_tile_flat.dart';
 import 'package:assignments/pages/task_detail_page.dart';
-import 'package:assignments/pages/task_edit_page.dart';
-import 'package:assignments/services/notification_service.dart';
+import 'package:assignments/util/route_transitions.dart';
 
 class ViewAllPage extends StatefulWidget {
   final ToDoDataBase db;
@@ -28,9 +27,10 @@ class ViewAllPage extends StatefulWidget {
 }
 
 class _ViewAllPageState extends State<ViewAllPage> {
-  bool _showGridView = false;
+
   bool _showSearch = false;
   String _searchQuery = '';
+  bool _sortNewestFirst = true;
 
   List filteredList({bool sortPinnedFirst = false}) {
     List tasks = _searchQuery.isEmpty
@@ -41,11 +41,21 @@ class _ViewAllPageState extends State<ViewAllPage> {
             return title.contains(_searchQuery.toLowerCase()) ||
                 content.contains(_searchQuery.toLowerCase());
           }).toList();
+    if (_sortNewestFirst) {
+      tasks = tasks.reversed.toList();
+    }
     if (sortPinnedFirst) {
       tasks.sort((a, b) {
+        // Pinned tasks come first
         final aPinned = a.length > 4 && a[4] == true ? 1 : 0;
         final bPinned = b.length > 4 && b[4] == true ? 1 : 0;
-        return bPinned.compareTo(aPinned);
+        if (aPinned != bPinned) {
+          return bPinned.compareTo(aPinned);
+        }
+        // Completed tasks go to the bottom
+        final aCompleted = a.length > 3 && a[3] == true ? 1 : 0;
+        final bCompleted = b.length > 3 && b[3] == true ? 1 : 0;
+        return aCompleted.compareTo(bCompleted);
       });
     }
     return tasks;
@@ -56,42 +66,6 @@ class _ViewAllPageState extends State<ViewAllPage> {
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: backgroundColor,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: FloatingActionButton(
-        shape: const CircleBorder(),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => TaskEditPage(
-                onSave: (newTask) {
-                  setState(() {
-                    widget.db.toDoList.add(newTask);
-                  });
-                  widget.db.updateDataBase();
-
-                  final idx = widget.db.toDoList.length - 1;
-                  final reminder = newTask.length > 5 ? newTask[5] as DateTime? : null;
-                  if (reminder != null) {
-                    NotificationService().scheduleReminder(
-                      index: idx,
-                      title: (newTask[0] ?? '').toString(),
-                      body: (newTask[1] ?? '').toString(),
-                      scheduledTime: reminder,
-                    );
-                  }
-                },
-              ),
-            ),
-          );
-        },
-        backgroundColor: Colors.white,
-        child: const Icon(
-          Icons.add,
-          color: Colors.black,
-          size: 35,
-        ),
-      ),
       appBar: AppBar(
         title: _showSearch
             ? TextField(
@@ -142,161 +116,117 @@ class _ViewAllPageState extends State<ViewAllPage> {
               });
             },
           ),
-          IconButton(
-            icon: Icon(
-              Icons.grid_view,
-              color: _showGridView ? Colors.green : Colors.white,
-            ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            onPressed: () {
+          const SizedBox(width: 16),
+          PopupMenuButton<bool>(
+            color: Colors.black,
+            onSelected: (value) {
               setState(() {
-                _showGridView = !_showGridView;
+                _sortNewestFirst = value;
               });
             },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<bool>>[
+              const PopupMenuItem<bool>(
+                value: true,
+                child: Text('Newest First', style: TextStyle(color: Colors.white)),
+              ),
+              const PopupMenuItem<bool>(
+                value: false,
+                child: Text('Oldest First', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              child: Center(
+                child: Text(
+                  'Sort',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
           ),
+          const SizedBox(width: 16),
         ],
       ),
-      body: Container(
-        color: backgroundColor,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 0.0),
-          child: !_showGridView
-              ? Builder(
-                  builder: (context) {
-                    final sortedTasks = filteredList(sortPinnedFirst: true);
-                    return GridView.builder(
-                      padding: EdgeInsets.zero,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 0.0,
-                        mainAxisSpacing: 4.0,
-                        childAspectRatio: 0.75,
-                      ),
-                      itemCount: sortedTasks.length,
-                      itemBuilder: (context, index) {
-                        final task = sortedTasks[index];
-                        final originalIndex =
-                            widget.db.toDoList.indexOf(task);
-                        final isPinned =
-                            task.length > 4 && task[4] == true;
-                        return ToDoTile(
-                          taskTitle: task[0],
-                          taskContent: task[1],
-                          taskDateTime: task[2],
-                          taskCompleted: task[3],
-                          onChanged: (value) =>
-                              widget.onChanged(value, originalIndex),
-                          deleteFunction: () =>
-                              widget.onDelete(originalIndex),
-                          editFunction: () =>
-                              widget.onEdit(originalIndex),
-                          isPinned: isPinned,
-                          outerPadding:
-                              const EdgeInsets.only(left: 0, right: 0, top: 6),
-                          onPin: () {
-                            setState(() {
-                              widget.onPin(originalIndex, !isPinned);
-                            });
-                          },
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              PageRouteBuilder(
-                                pageBuilder: (_, __, ___) => TaskDetailPage(
-                                  task: task,
-                                  onEdit: () =>
-                                      widget.onEdit(originalIndex),
-                                  onDelete: () =>
-                                      widget.onDelete(originalIndex),
-                                  onToggleComplete: (value) =>
-                                      widget.onChanged(
-                                          value, originalIndex),
-                                  onTogglePin: (pin) {
-                                    widget.onPin(originalIndex, pin);
-                                    setState(() {});
-                                  },
-                                ),
-                                transitionsBuilder:
-                                    (_, animation, __, child) {
-                                  const begin = Offset(0.0, 0.1);
-                                  const end = Offset.zero;
-                                  final slide = Tween(begin: begin, end: end)
-                                      .chain(CurveTween(
-                                          curve: Curves.easeOut));
-                                  final fade = CurvedAnimation(
-                                      parent: animation,
-                                      curve: Curves.easeIn);
-                                  return SlideTransition(
-                                    position:
-                                        animation.drive(slide),
-                                    child: FadeTransition(
-                                        opacity: fade, child: child),
-                                  );
-                                },
-                              ),
-                            );
-                          },
-                          showPin: true,
+      body: SafeArea(
+        bottom: true,
+        child: Container(
+          color: backgroundColor,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 8.0),
+            child: Builder(
+              builder: (context) {
+                final sortedTasks = filteredList(sortPinnedFirst: true);
+                return ListView.builder(
+                  padding: const EdgeInsets.only(top: 15, bottom: 40),
+                  itemCount: sortedTasks.length,
+                  itemBuilder: (context, index) {
+                    final task = sortedTasks[index];
+                    final originalIndex = widget.db.toDoList.indexOf(task);
+                    final isPinned = task.length > 4 && task[4] == true;
+
+                    return ToDoTileFlat(
+                      taskTitle: task[0],
+                      taskContent: task[1],
+                      taskDateTime: task[2],
+                      taskCompleted: task[3],
+                      onChanged: (value) {
+                        widget.onChanged(value, originalIndex);
+                        setState(() {});
+                      },
+                      deleteFunction: () {
+                        widget.onDelete(originalIndex);
+                        setState(() {});
+                      },
+                      editFunction: () async {
+                        await widget.onEdit(originalIndex);
+                        setState(() {});
+                      },
+                      isPinned: isPinned,
+                      onPin: () {
+                        widget.onPin(originalIndex, !isPinned);
+                        setState(() {});
+                      },
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          createSmoothTransitionRoute(
+                            TaskDetailPage(
+                              task: task,
+                              onEdit: () async {
+                                await widget.onEdit(originalIndex);
+                                setState(() {});
+                              },
+                              onDelete: () {
+                                widget.onDelete(originalIndex);
+                                setState(() {});
+                              },
+                              onToggleComplete: (value) {
+                                widget.onChanged(value, originalIndex);
+                                setState(() {});
+                              },
+                              onTogglePin: (pin) {
+                                widget.onPin(originalIndex, pin);
+                                setState(() {});
+                              },
+                              onTaskUpdated: () {
+                                widget.db.updateDataBase();
+                                setState(() {});
+                              },
+                            ),
+                          ),
                         );
+                        setState(() {});
                       },
                     );
                   },
-                )
-              : Builder(
-                  builder: (context) {
-                    final sortedTasks = filteredList(sortPinnedFirst: true);
-                    return GridView.builder(
-                      padding: const EdgeInsets.all(5.0),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 4.0,
-                        mainAxisSpacing: 4.0,
-                        childAspectRatio: 3.5,
-                      ),
-                      itemCount: sortedTasks.length,
-                      itemBuilder: (context, index) {
-                        final task = sortedTasks[index];
-                        final originalIndex =
-                            widget.db.toDoList.indexOf(task);
-                        final isPinned =
-                            task.length > 4 && task[4] == true;
-                        return ToDoTileShrinked(
-                          taskTitle: task[0],
-                          taskDateTime: task[2],
-                          taskCompleted: task[3],
-                          onChanged: (value) =>
-                              widget.onChanged(value, originalIndex),
-                          deleteFunction: () =>
-                              widget.onDelete(originalIndex),
-                          editFunction: () =>
-                              widget.onEdit(originalIndex),
-                          isPinned: isPinned,
-                          onPin: () {
-                            setState(() {
-                              widget.onPin(originalIndex, !isPinned);
-                            });
-                          },
-                        );
-                      },
-                    );
-                  },
-                ),
-        ),
-      ),
-      bottomNavigationBar: ClipRRect(
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(25),
-          topRight: Radius.circular(25),
-        ),
-        child: BottomAppBar(
-          padding: const EdgeInsets.only(left: 40, right: 40),
-          height: 75,
-          shape: const CircularNotchedRectangle(),
-          color: navbarColor,
-          child: const SizedBox.shrink(),
+                );
+              },
+            ),
+          ),
         ),
       ),
     );

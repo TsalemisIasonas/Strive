@@ -7,9 +7,7 @@ class ToDoDataBase {
 
   void createInitialData() {
     toDoList = [
-      ["Make Tutorial", "Learn how to make a to-do app", null, false, false, null],
-      ["Do Exercise", "30 min run", null, false, false, null],
-      ["Read Book", "Finish 10 pages of your novel", null, false, false, null],
+      ["Add tasks", "Create new tasks and navigate the app", null, false, false, null],
     ];
     updateDataBase();
   }
@@ -27,7 +25,7 @@ class ToDoDataBase {
         // Normalize to:
         // [title, content, dueDate, completed, pinned, reminderDateTime, optionalChecklist]
         // We keep index 6 (checklist) as-is if present, otherwise null.
-        final fixed = List<dynamic>.filled(7, null);
+        final fixed = List<dynamic>.filled(7, null, growable: true);
         for (int i = 0; i < task.length && i < 7; i++) {
           fixed[i] = task[i];
         }

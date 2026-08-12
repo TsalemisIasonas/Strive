@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 
 class TaskDetailPage extends StatefulWidget {
   final List task; // task structure: [title, content, dateTime, completed, (optional) pinned]
-  final VoidCallback onEdit;
+  final Future<void> Function() onEdit;
   final VoidCallback onDelete;
   final ValueChanged<bool?> onToggleComplete;
   final ValueChanged<bool>? onTogglePin;
+  final VoidCallback? onTaskUpdated;
 
   const TaskDetailPage({
     super.key,
@@ -15,6 +16,7 @@ class TaskDetailPage extends StatefulWidget {
     required this.onDelete,
     required this.onToggleComplete,
     this.onTogglePin,
+    this.onTaskUpdated,
   });
 
   @override
@@ -38,6 +40,27 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       _completed = newValue;
     });
     widget.onToggleComplete(newValue);
+  }
+
+  void _updatePreview() {
+    if (widget.task.length > 6 && widget.task[6] is List) {
+      final List<String> previews = [];
+      for (var block in (widget.task[6] as List)) {
+        if (block is Map) {
+          final type = block['type']?.toString() ?? 'text';
+          final content = block['content']?.toString() ?? block['text']?.toString() ?? '';
+          final isDone = block['done'] == true;
+          if (content.isNotEmpty) {
+            if (type == 'text') {
+              previews.add(content);
+            } else if (type == 'checklist') {
+              previews.add('${isDone ? '✓' : '•'} $content');
+            }
+          }
+        }
+      }
+      widget.task[1] = previews.join('\n');
+    }
   }
 
   void _togglePinned() {
@@ -88,7 +111,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           IconButton(
             tooltip: 'Edit Task',
             icon: const Icon(Icons.edit),
-            onPressed: widget.onEdit,
+            onPressed: () async {
+              await widget.onEdit();
+              if (mounted) setState(() {});
+            },
           ),
           IconButton(
             tooltip: 'Delete Task',
@@ -131,7 +157,12 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: EdgeInsets.only(
+          left: 24.0,
+          right: 24.0,
+          top: 24.0,
+          bottom: MediaQuery.of(context).padding.bottom,
+        ),
         child: Stack(
           children: [
             Center(
@@ -148,73 +179,108 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          content,
-                          style: const TextStyle(
-                              fontSize: 18, color: Colors.white),
-                        ),
-                        const SizedBox(height: 16),
                         if (checklist.isNotEmpty) ...[
-                          const Text(
-                            'Checklist',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
                           ...checklist.map((rawItem) {
+                            String type = 'text';
                             String text = '';
                             bool done = false;
+
                             if (rawItem is Map) {
-                              text = rawItem['text']?.toString() ?? '';
-                              done = rawItem['done'] == true;
+                              if (rawItem.containsKey('type')) {
+                                type = rawItem['type']?.toString() ?? 'text';
+                                text = rawItem['content']?.toString() ?? rawItem['text']?.toString() ?? '';
+                                done = rawItem['done'] == true;
+                              } else {
+                                type = 'checklist';
+                                text = rawItem['text']?.toString() ?? '';
+                                done = rawItem['done'] == true;
+                              }
                             } else if (rawItem is List && rawItem.length >= 2) {
+                              type = 'checklist';
                               text = rawItem[0]?.toString() ?? '';
                               done = rawItem[1] == true;
                             }
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2.0),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    done
-                                        ? Icons.check_box
-                                        : Icons.check_box_outline_blank,
-                                    color: done
-                                        ? Colors.greenAccent
-                                        : Colors.white70,
-                                    size: 22,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      text,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
+
+                            if (type == 'text') {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                child: Text(
+                                  text,
+                                  style: const TextStyle(
+                                      fontSize: 18, color: Colors.white),
+                                ),
+                              );
+                            } else {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 2.0),
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () {
+                                    setState(() {
+                                      if (rawItem is Map) {
+                                        rawItem['done'] = !done;
+                                      } else if (rawItem is List && rawItem.length >= 2) {
+                                        rawItem[1] = !done;
+                                      }
+                                      _updatePreview();
+                                    });
+                                    widget.onTaskUpdated?.call();
+                                  },
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2.0),
+                                        child: Icon(
+                                          done
+                                              ? Icons.check_box
+                                              : Icons.check_box_outline_blank,
+                                          color: done
+                                              ? Colors.greenAccent
+                                              : Colors.white70,
+                                          size: 28,
+                                        ),
                                       ),
-                                    ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          text,
+                                          style: TextStyle(
+                                            color: done ? Colors.white54 : Colors.white,
+                                            fontSize: 17,
+                                            decoration: done ? TextDecoration.lineThrough : null,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            );
+                                ),
+                              );
+                            }
                           }).toList(),
-                          const SizedBox(height: 16),
+                        ] else if (content != null) ...[
+                           Text(
+                             content.toString(),
+                             style: const TextStyle(
+                                 fontSize: 18, color: Colors.white),
+                           ),
                         ],
-                        Text(
-                          dateTime == null
-                              ? 'Due: No due date set'
-                              : 'Due: '
-                                  '${dateTime!.day.toString().padLeft(2, '0')}/'
-                                  '${dateTime!.month.toString().padLeft(2, '0')}/'
-                                  '${dateTime!.year}',
-                          style: const TextStyle(
-                              fontSize: 16, color: Colors.white),
-                        ),
                         const SizedBox(height: 16),
                       ],
                     ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 12.0, bottom: 8.0),
+                  child: Text(
+                    dateTime == null
+                        ? 'Due: No due date set'
+                        : 'Due: '
+                            '${dateTime!.day.toString().padLeft(2, '0')}/'
+                            '${dateTime!.month.toString().padLeft(2, '0')}/'
+                            '${dateTime!.year}',
+                    style: const TextStyle(
+                        fontSize: 16, color: Colors.white70),
                   ),
                 ),
                 Container(

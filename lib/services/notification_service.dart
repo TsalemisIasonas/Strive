@@ -86,8 +86,8 @@ class NotificationService {
 
     try {
       // Use correct timezone package
-      final String localTz = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(localTz));
+      final localTz = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(localTz.identifier));
     } catch (e) {
       tz.setLocalLocation(tz.getLocation('Europe/Athens'));
     }
@@ -108,7 +108,6 @@ class NotificationService {
     required String body,
     required DateTime scheduledTime,
   }) async {
-    print('Scheduling reminder: index=$index, scheduledTime=$scheduledTime, now=${DateTime.now()}');
     final now = DateTime.now();
     if (scheduledTime.isBefore(now.subtract(const Duration(seconds: 5)))) {
       return;
@@ -117,7 +116,7 @@ class NotificationService {
     await init();
     // We already requested permissions at startup; avoid depending on
     // exact alarm permission here to keep behaviour more reliable.
-    final (canSchedule, _) = await _ensurePermissions();
+    final (canSchedule, scheduleMode) = await _ensurePermissions();
     if (!canSchedule) return;
 
     await _ensureTimeZoneConfigured();
@@ -136,11 +135,11 @@ class NotificationService {
 
     await _flutterLocalNotificationsPlugin.zonedSchedule(
       _idForTask(index),
-      title,
-      body,
+      title.isEmpty ? 'Task Reminder' : (title[0].toUpperCase() + title.substring(1)),
+      body.isEmpty ? 'You have a scheduled task.' : (body[0].toUpperCase() + body.substring(1)),
       scheduledDate,
       details,
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: scheduleMode ?? AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: null,

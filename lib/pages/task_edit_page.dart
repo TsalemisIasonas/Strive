@@ -15,53 +15,90 @@ class TaskEditPage extends StatefulWidget {
   State<TaskEditPage> createState() => _TaskEditPageState();
 }
 
+class BlockItem {
+  String type; // 'text' or 'checklist'
+  TextEditingController controller;
+  bool isDone;
+  FocusNode focusNode;
+
+  BlockItem({
+    required this.type,
+    String content = '',
+    this.isDone = false,
+  })  : controller = TextEditingController(text: content),
+        focusNode = FocusNode();
+
+  void dispose() {
+    controller.dispose();
+    focusNode.dispose();
+  }
+}
+
 class _TaskEditPageState extends State<TaskEditPage> {
   late TextEditingController _titleController;
-  late TextEditingController _contentController;
   DateTime? _selectedDateTime;
   DateTime? _reminderDateTime;
   bool _pinned = false;
-  final List<Map<String, dynamic>> _checklist = [];
-  bool _isChecklistNote = false;
+  
+  final List<BlockItem> _blocks = [];
 
   @override
   void initState() {
     super.initState();
     final task = widget.initialTask;
     _titleController = TextEditingController(text: task != null ? (task[0] ?? '').toString() : '');
-    _contentController = TextEditingController(text: task != null ? (task[1] ?? '').toString() : '');
     _selectedDateTime = task != null ? task[2] as DateTime? : null;
     _reminderDateTime = task != null && task.length > 5 ? task[5] as DateTime? : null;
     _pinned = task != null && task.length > 4 ? (task[4] as bool? ?? false) : false;
 
-    if (task != null && task.length > 6 && task[6] is List) {
+    if (task != null && task.length > 6 && task[6] is List && (task[6] as List).isNotEmpty) {
       for (final item in (task[6] as List)) {
-        String text;
-        bool done;
-
-        if (item is Map<String, dynamic>) {
-          text = item['text']?.toString() ?? '';
-          done = item['done'] == true;
+        if (item is Map) {
+          if (item.containsKey('type')) {
+            // Modern block format
+            _blocks.add(BlockItem(
+              type: item['type']?.toString() ?? 'text',
+              content: item['content']?.toString() ?? item['text']?.toString() ?? '',
+              isDone: item['done'] == true,
+            ));
+          } else {
+            // Legacy checklist format
+            _blocks.add(BlockItem(
+              type: 'checklist',
+              content: item['text']?.toString() ?? '',
+              isDone: item['done'] == true,
+            ));
+          }
         } else if (item is List && item.length >= 2) {
-          text = item[0]?.toString() ?? '';
-          done = item[1] == true;
-        } else {
-          continue;
+          _blocks.add(BlockItem(
+            type: 'checklist',
+            content: item[0]?.toString() ?? '',
+            isDone: item[1] == true,
+          ));
         }
+      }
+    }
 
-        _checklist.add({'text': text, 'done': done});
+    // If no blocks were added (legacy plain text note), convert text into a block
+    if (_blocks.isEmpty && task != null && task.length > 1) {
+      final content = (task[1] ?? '').toString();
+      if (content.isNotEmpty) {
+        _blocks.add(BlockItem(type: 'text', content: content));
       }
-      // Existing task that already has a checklist is a checklist note
-      if (_checklist.isNotEmpty) {
-        _isChecklistNote = true;
-      }
+    }
+
+    // Default to at least one text block if completely empty
+    if (_blocks.isEmpty) {
+      _blocks.add(BlockItem(type: 'text'));
     }
   }
 
   @override
   void dispose() {
     _titleController.dispose();
-    _contentController.dispose();
+    for (var block in _blocks) {
+      block.dispose();
+    }
     super.dispose();
   }
 
@@ -91,10 +128,26 @@ class _TaskEditPageState extends State<TaskEditPage> {
 
     if (date == null) return;
 
+    if (!mounted) return;
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(initialDate),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              tertiary: Colors.green,
+              onTertiary: Colors.white,
+              tertiaryContainer: Colors.green,
+              onTertiaryContainer: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
+
+    if (!mounted) return;
 
     if (time == null) {
       setState(() {
@@ -109,9 +162,31 @@ class _TaskEditPageState extends State<TaskEditPage> {
 
   void _save() {
     final title = _titleController.text.trim();
-    final content = _contentController.text.trim();
 
-    if (!_isChecklistNote && title.isEmpty && content.isEmpty) {
+    // Generate plain-text preview and structured blocks
+    final List<String> textPreviews = [];
+    final List<Map<String, dynamic>> serializedBlocks = [];
+
+    for (var block in _blocks) {
+      final content = block.controller.text.trim();
+      if (content.isNotEmpty || _blocks.length == 1) { // allow saving empty single block
+        if (block.type == 'text' && content.isNotEmpty) {
+          textPreviews.add(content);
+        } else if (block.type == 'checklist' && content.isNotEmpty) {
+          textPreviews.add('${block.isDone ? '✓' : '•'} $content');
+        }
+        
+        serializedBlocks.add({
+          'type': block.type,
+          'content': block.controller.text, // keep raw text (not trimmed for internal format)
+          'done': block.isDone,
+        });
+      }
+    }
+
+    final combinedPreview = textPreviews.join('\n');
+
+    if (title.isEmpty && combinedPreview.isEmpty) {
       Navigator.of(context).pop();
       return;
     }
@@ -121,20 +196,37 @@ class _TaskEditPageState extends State<TaskEditPage> {
 
     final updatedTask = <dynamic>[
       title,
-      _isChecklistNote ? '' : content,
+      combinedPreview,
       _selectedDateTime,
       completed,
       _pinned,
       _reminderDateTime,
-      _isChecklistNote && _checklist.isNotEmpty ? _checklist : null,
+      serializedBlocks, // save structured blocks in index 6
     ];
     widget.onSave(updatedTask);
     Navigator.of(context).pop();
   }
 
+  void _addBlock(String type) {
+    setState(() {
+      // If the editor only has one block, and it's an empty text block, remove it.
+      if (_blocks.length == 1 && _blocks[0].type == 'text' && _blocks[0].controller.text.trim().isEmpty) {
+        _blocks[0].dispose();
+        _blocks.clear();
+      }
+      _blocks.add(BlockItem(type: type));
+    });
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (mounted && _blocks.isNotEmpty) {
+        _blocks.last.focusNode.requestFocus();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: backgroundColor,
       appBar: AppBar(
         backgroundColor: darkGreen,
@@ -144,6 +236,16 @@ class _TaskEditPageState extends State<TaskEditPage> {
           style: const TextStyle(color: Colors.white),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.notes),
+            tooltip: 'Add Text',
+            onPressed: () => _addBlock('text'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.check_box_outlined),
+            tooltip: 'Add Checklist',
+            onPressed: () => _addBlock('checklist'),
+          ),
           if (widget.initialTask != null)
             IconButton(
               icon: Icon(
@@ -165,7 +267,14 @@ class _TaskEditPageState extends State<TaskEditPage> {
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: EdgeInsets.only(
+          left: 20.0,
+          right: 20.0,
+          top: 20.0,
+          bottom: MediaQuery.of(context).padding.bottom + 
+                  MediaQuery.of(context).viewInsets.bottom + 
+                  (MediaQuery.of(context).viewInsets.bottom > 0 ? 16.0 : 0.0),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -180,35 +289,104 @@ class _TaskEditPageState extends State<TaskEditPage> {
             ),
             const SizedBox(height: 8),
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (!_isChecklistNote)
-                      TextField(
-                        controller: _contentController,
-                        style: const TextStyle(color: Colors.white, fontSize: 18),
-                        maxLines: null,
-                        decoration: const InputDecoration(
-                          hintText: 'Write your task details here...',
-                          hintStyle: TextStyle(color: Colors.white54),
-                          border: InputBorder.none,
-                        ),
-                      ),
-                    if (_isChecklistNote)
-                      _ChecklistEditor(
-                        items: _checklist,
-                        onChanged: (items) {
-                          setState(() {
-                            _checklist
-                              ..clear()
-                              ..addAll(items);
-                          });
-                        },
-                      ),
-                    const SizedBox(height: 8),
-                  ],
-                ),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: _blocks.length,
+                      itemBuilder: (context, index) {
+                        final block = _blocks[index];
+                        if (block.type == 'text') {
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: block.controller,
+                                  focusNode: block.focusNode,
+                                  style: const TextStyle(color: Colors.white, fontSize: 18),
+                                  maxLines: null,
+                                  decoration: InputDecoration(
+                                    hintText: index == 0 ? 'Write your task details here...' : 'Text block',
+                                    hintStyle: const TextStyle(color: Colors.white54),
+                                    border: InputBorder.none,
+                                  ),
+                                  onChanged: (val) {
+                                    // Auto-spawn text block on triple enter (optional, skipping for now)
+                                  },
+                                ),
+                              ),
+                              if (_blocks.length > 1)
+                                IconButton(
+                                  icon: const Icon(Icons.close, color: Colors.white70, size: 18),
+                                  onPressed: () {
+                                    setState(() {
+                                      _blocks.removeAt(index);
+                                    });
+                                  },
+                                ),
+                            ],
+                          );
+                        } else if (block.type == 'checklist') {
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Checkbox(
+                                value: block.isDone,
+                                activeColor: Colors.green,
+                                onChanged: (value) {
+                                  setState(() {
+                                    block.isDone = value ?? false;
+                                  });
+                                },
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: block.controller,
+                                  focusNode: block.focusNode,
+                                  style: TextStyle(
+                                    color: block.isDone ? Colors.white54 : Colors.white, 
+                                    fontSize: 16,
+                                    decoration: block.isDone ? TextDecoration.lineThrough : null,
+                                  ),
+                                  decoration: const InputDecoration(
+                                    hintText: 'Checklist item',
+                                    hintStyle: TextStyle(color: Colors.white54),
+                                    border: InputBorder.none,
+                                  ),
+                                  maxLines: null,
+                                  onChanged: (val) {
+                                    // If user presses Enter, auto-spawn new checklist item
+                                    if (val.endsWith('\n')) {
+                                      block.controller.text = val.substring(0, val.length - 1);
+                                      setState(() {
+                                        _blocks.insert(index + 1, BlockItem(type: 'checklist'));
+                                      });
+                                      Future.delayed(const Duration(milliseconds: 50), () {
+                                        if (mounted && _blocks.length > index + 1) {
+                                          _blocks[index + 1].focusNode.requestFocus();
+                                        }
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close, color: Colors.white70, size: 18),
+                                onPressed: () {
+                                  setState(() {
+                                    _blocks.removeAt(index);
+                                  });
+                                },
+                              ),
+                            ],
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 12),
@@ -269,11 +447,12 @@ class _TaskEditPageState extends State<TaskEditPage> {
                 ),
                 TextButton.icon(
                   onPressed: () async {
+                    final ctx = context;
                     final now = DateTime.now();
                     final base = _reminderDateTime ?? _selectedDateTime ?? now;
 
                     final date = await showDatePicker(
-                      context: context,
+                      context: ctx,
                       initialDate: base,
                       firstDate: DateTime(now.year - 1),
                       lastDate: DateTime(now.year + 5),
@@ -294,10 +473,26 @@ class _TaskEditPageState extends State<TaskEditPage> {
 
                     if (date == null) return;
 
+                    if (!ctx.mounted) return;
                     final time = await showTimePicker(
-                      context: context,
+                      context: ctx,
                       initialTime: TimeOfDay.fromDateTime(base),
+                      builder: (context, child) {
+                        return Theme(
+                          data: Theme.of(context).copyWith(
+                            colorScheme: Theme.of(context).colorScheme.copyWith(
+                              tertiary: Colors.green,
+                              onTertiary: Colors.white,
+                              tertiaryContainer: Colors.green,
+                              onTertiaryContainer: Colors.white,
+                            ),
+                          ),
+                          child: child!,
+                        );
+                      },
                     );
+
+                    if (!mounted) return;
 
                     setState(() {
                       if (time == null) {
@@ -323,88 +518,3 @@ class _TaskEditPageState extends State<TaskEditPage> {
   }
 }
 
-class _ChecklistEditor extends StatefulWidget {
-  final List<Map<String, dynamic>> items;
-  final ValueChanged<List<Map<String, dynamic>>> onChanged;
-
-  const _ChecklistEditor({
-    required this.items,
-    required this.onChanged,
-  });
-
-  @override
-  State<_ChecklistEditor> createState() => _ChecklistEditorState();
-}
-
-class _ChecklistEditorState extends State<_ChecklistEditor> {
-  void _updateItem(int index, Map<String, dynamic> newItem) {
-    final List<Map<String, dynamic>> updated = List<Map<String, dynamic>>.from(widget.items);
-    updated[index] = newItem;
-    widget.onChanged(updated);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.items.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      children: [
-        ...List.generate(widget.items.length, (index) {
-          final item = widget.items[index];
-          final controller = TextEditingController(text: item['text']?.toString() ?? '');
-
-          return Row(
-            children: [
-              Checkbox(
-                value: item['done'] == true,
-                activeColor: Colors.green,
-                onChanged: (value) {
-                  _updateItem(index, {
-                    'text': item['text']?.toString() ?? '',
-                    'done': value ?? false,
-                  });
-                },
-              ),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
-                  decoration: const InputDecoration(
-                    hintText: 'Checklist item',
-                    hintStyle: TextStyle(color: Colors.white54),
-                    border: InputBorder.none,
-                  ),
-                  textInputAction: TextInputAction.done,
-                  minLines: 1,
-                  maxLines: 1,
-                  onChanged: (value) {
-                    _updateItem(index, {
-                      'text': value,
-                      'done': item['done'] == true,
-                    });
-                  },
-                  onSubmitted: (_) {
-                    if (index == widget.items.length - 1) {
-                      final updated = List<Map<String, dynamic>>.from(widget.items)
-                        ..add({'text': '', 'done': false});
-                      widget.onChanged(updated);
-                    }
-                  },
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close, color: Colors.white70, size: 18),
-                onPressed: () {
-                  final updated = List<Map<String, dynamic>>.from(widget.items)..removeAt(index);
-                  widget.onChanged(updated);
-                },
-              ),
-            ],
-          );
-        }),
-      ],
-    );
-  }
-}

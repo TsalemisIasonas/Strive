@@ -11,7 +11,7 @@ class UsernameDialogBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: Colors.black.withOpacity(0.95),
+      backgroundColor: Colors.black.withValues(alpha: 0.95),
       content: SizedBox(
         width: 200,
         height: 200,
