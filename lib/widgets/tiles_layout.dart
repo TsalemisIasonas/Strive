@@ -2,9 +2,6 @@ import '../data/database.dart';
 import '../util/todo_tile.dart';
 import '../util/todo_tile_shrinked.dart';
 import 'package:flutter/material.dart';
-import '../pages/task_detail_page.dart';
-import 'package:assignments/util/route_transitions.dart';
-
 class TilesLayout extends StatefulWidget {
   final ToDoDataBase db;
   final Function(bool?, int) onChanged;
@@ -167,25 +164,7 @@ class _TilesLayoutState extends State<TilesLayout> {
                           },
                           showPin: true,
                           onTap: () async {
-                            await Navigator.push(
-                              context,
-                              createSmoothTransitionRoute(
-                                TaskDetailPage(
-                                  task: topTasks[index],
-                                  onEdit: () => widget.onEdit(originalIndex),
-                                  onDelete: () => widget.onDelete(originalIndex),
-                                  onToggleComplete: (value) => widget.onChanged(value, originalIndex),
-                                  onTogglePin: (pin) {
-                                    widget.onPin(originalIndex, pin);
-                                    setState(() {});
-                                  },
-                                  onTaskUpdated: () {
-                                    widget.db.updateDataBase();
-                                    setState(() {});
-                                  },
-                                ),
-                              ),
-                            );
+                            await widget.onEdit(originalIndex);
                             if (mounted) {
                               setState(() {});
                               _scrollController.animateTo(

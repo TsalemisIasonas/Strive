@@ -266,20 +266,21 @@ class _TaskEditPageState extends State<TaskEditPage> {
           ),
         ],
       ),
-      body: Padding(
+      body: AnimatedPadding(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
         padding: EdgeInsets.only(
           left: 20.0,
           right: 20.0,
           top: 20.0,
           bottom: MediaQuery.of(context).padding.bottom + 
-                  MediaQuery.of(context).viewInsets.bottom + 
-                  (MediaQuery.of(context).viewInsets.bottom > 0 ? 16.0 : 0.0),
+                  MediaQuery.of(context).viewInsets.bottom + 16.0,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: ListView(
           children: [
             TextField(
               controller: _titleController,
+              textCapitalization: TextCapitalization.sentences,
               style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600),
               decoration: const InputDecoration(
                 hintText: 'Title',
@@ -288,12 +289,10 @@ class _TaskEditPageState extends State<TaskEditPage> {
               ),
             ),
             const SizedBox(height: 8),
-            Expanded(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: _blocks.length,
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _blocks.length,
                       itemBuilder: (context, index) {
                         final block = _blocks[index];
                         if (block.type == 'text') {
@@ -304,6 +303,7 @@ class _TaskEditPageState extends State<TaskEditPage> {
                                 child: TextField(
                                   controller: block.controller,
                                   focusNode: block.focusNode,
+                                  textCapitalization: TextCapitalization.sentences,
                                   style: const TextStyle(color: Colors.white, fontSize: 18),
                                   maxLines: null,
                                   decoration: InputDecoration(
@@ -344,6 +344,7 @@ class _TaskEditPageState extends State<TaskEditPage> {
                                 child: TextField(
                                   controller: block.controller,
                                   focusNode: block.focusNode,
+                                  textCapitalization: TextCapitalization.sentences,
                                   style: TextStyle(
                                     color: block.isDone ? Colors.white54 : Colors.white, 
                                     fontSize: 16,
@@ -385,10 +386,6 @@ class _TaskEditPageState extends State<TaskEditPage> {
                         return const SizedBox.shrink();
                       },
                     ),
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -3,9 +3,6 @@ import 'package:assignments/constants/colors.dart';
 import 'package:assignments/data/database.dart';
 
 import 'package:assignments/util/todo_tile_flat.dart';
-import 'package:assignments/pages/task_detail_page.dart';
-import 'package:assignments/util/route_transitions.dart';
-
 class ViewAllPage extends StatefulWidget {
   final ToDoDataBase db;
   final Function(bool?, int) onChanged;
@@ -191,34 +188,7 @@ class _ViewAllPageState extends State<ViewAllPage> {
                         setState(() {});
                       },
                       onTap: () async {
-                        await Navigator.push(
-                          context,
-                          createSmoothTransitionRoute(
-                            TaskDetailPage(
-                              task: task,
-                              onEdit: () async {
-                                await widget.onEdit(originalIndex);
-                                setState(() {});
-                              },
-                              onDelete: () {
-                                widget.onDelete(originalIndex);
-                                setState(() {});
-                              },
-                              onToggleComplete: (value) {
-                                widget.onChanged(value, originalIndex);
-                                setState(() {});
-                              },
-                              onTogglePin: (pin) {
-                                widget.onPin(originalIndex, pin);
-                                setState(() {});
-                              },
-                              onTaskUpdated: () {
-                                widget.db.updateDataBase();
-                                setState(() {});
-                              },
-                            ),
-                          ),
-                        );
+                        await widget.onEdit(originalIndex);
                         setState(() {});
                       },
                     );
