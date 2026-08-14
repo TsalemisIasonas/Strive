@@ -275,16 +275,84 @@ class _TaskEditPageState extends State<TaskEditPage> {
 
   void _addBlock(String type) {
     setState(() {
-      // If the editor only has one block, and it's an empty text block, remove it.
-      if (_blocks.length == 1 && _blocks[0].type == 'text' && _blocks[0].controller.text.trim().isEmpty) {
-        _blocks[0].dispose();
-        _blocks.clear();
-      }
-      _blocks.add(BlockItem(type: type));
-    });
-    Future.delayed(const Duration(milliseconds: 50), () {
-      if (mounted && _blocks.isNotEmpty) {
-        _blocks.last.focusNode.requestFocus();
+      final focusedIndex = _blocks.indexWhere((b) => b.focusNode.hasFocus);
+
+      if (focusedIndex != -1) {
+        if (_blocks[focusedIndex].type != type) {
+          final block = _blocks[focusedIndex];
+          if (type == 'checklist' && block.type == 'text') {
+            final selection = block.controller.selection;
+            final text = block.controller.text;
+            final blocksToRemove = <BlockItem>[];
+
+            if (selection.isValid && selection.start != selection.end) {
+              final beforeText = text.substring(0, selection.start);
+              final selectedText = text.substring(selection.start, selection.end);
+              final afterText = text.substring(selection.end);
+
+              int insertIndex = focusedIndex;
+
+              if (beforeText.trim().isEmpty) {
+                blocksToRemove.add(block);
+              } else {
+                block.controller.text = beforeText;
+                insertIndex++;
+              }
+
+              final lines = selectedText.split('\n').where((line) => line.trim().isNotEmpty).toList();
+              for (var line in lines) {
+                _blocks.insert(insertIndex, BlockItem(type: 'checklist', content: line));
+                insertIndex++;
+              }
+
+              if (afterText.trim().isNotEmpty) {
+                _blocks.insert(insertIndex, BlockItem(type: 'text', content: afterText));
+              }
+            } else {
+              // Convert the entire block line by line
+              final lines = text.split('\n').where((line) => line.trim().isNotEmpty).toList();
+              if (lines.isEmpty) {
+                block.type = 'checklist';
+              } else {
+                blocksToRemove.add(block);
+                int insertIndex = focusedIndex;
+                for (var line in lines) {
+                  _blocks.insert(insertIndex, BlockItem(type: 'checklist', content: line));
+                  insertIndex++;
+                }
+              }
+            }
+
+            for (var b in blocksToRemove) {
+              _blocks.remove(b);
+              // Delay disposal to prevent immediate focus node tree errors
+              Future.delayed(const Duration(milliseconds: 50), () => b.dispose());
+            }
+          } else {
+            // Converting checklist to text
+            _blocks[focusedIndex].type = type;
+          }
+        } else {
+          // If it's already the requested type, add a new one right below it
+          _blocks.insert(focusedIndex + 1, BlockItem(type: type));
+          Future.delayed(const Duration(milliseconds: 50), () {
+            if (mounted && _blocks.length > focusedIndex + 1) {
+              _blocks[focusedIndex + 1].focusNode.requestFocus();
+            }
+          });
+        }
+      } else {
+        // If the editor only has one block, and it's an empty text block, remove it.
+        if (_blocks.length == 1 && _blocks[0].type == 'text' && _blocks[0].controller.text.trim().isEmpty) {
+          _blocks[0].dispose();
+          _blocks.clear();
+        }
+        _blocks.add(BlockItem(type: type));
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (mounted && _blocks.isNotEmpty) {
+            _blocks.last.focusNode.requestFocus();
+          }
+        });
       }
     });
   }
@@ -376,12 +444,13 @@ class _TaskEditPageState extends State<TaskEditPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  InkWell(
+                  GestureDetector(
                     onTap: () {
                       setState(() {
                         _showReminders = !_showReminders;
                       });
                     },
+                    behavior: HitTestBehavior.opaque,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8.0),
                       child: Row(
