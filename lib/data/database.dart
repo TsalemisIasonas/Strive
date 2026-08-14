@@ -7,7 +7,7 @@ class ToDoDataBase {
 
   void createInitialData() {
     toDoList = [
-      ["Add tasks", "Create new tasks and navigate the app", null, false, false, null],
+      ["Add tasks", "Create new tasks and navigate the app", null, false, false, <DateTime>[]],
     ];
     updateDataBase();
   }
@@ -34,10 +34,18 @@ class ToDoDataBase {
         fixed[3] = fixed[3] ?? false;
         // Ensure pinned defaults to false
         fixed[4] = fixed[4] ?? false;
+        // Migrate reminder to a list
+        if (fixed[5] is DateTime) {
+          fixed[5] = [fixed[5] as DateTime];
+        } else if (fixed[5] == null) {
+          fixed[5] = <DateTime>[];
+        } else if (fixed[5] is List) {
+          fixed[5] = (fixed[5] as List).cast<DateTime>().toList();
+        }
 
         return fixed;
       } else {
-        return ["", "", null, false, false, null, null];
+        return ["", "", null, false, false, <DateTime>[], null];
       }
     }).toList();
   }

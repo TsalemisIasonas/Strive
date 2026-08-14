@@ -89,17 +89,15 @@ class _HomePageState extends State<HomePage> {
             db.updateDataBase();
 
             final idx = db.toDoList.length - 1;
-            final reminder =
-                newTask.length > 5 ? newTask[5] as DateTime? : null;
+            final reminders =
+                newTask.length > 5 ? (newTask[5] as List<DateTime>?) ?? [] : <DateTime>[];
 
-            if (reminder != null) {
-              NotificationService().scheduleReminder(
-                index: idx,
-                title: (newTask[0] ?? '').toString(),
-                body: (newTask[1] ?? '').toString(),
-                scheduledTime: reminder,
-              );
-            }
+            NotificationService().scheduleReminder(
+              index: idx,
+              title: (newTask[0] ?? '').toString(),
+              body: (newTask[1] ?? '').toString(),
+              scheduledTimes: reminders,
+            );
           },
         ),
       ),
@@ -134,19 +132,15 @@ class _HomePageState extends State<HomePage> {
             });
             db.updateDataBase();
 
-            final reminder =
-                updatedTask.length > 5 ? updatedTask[5] as DateTime? : null;
+            final reminders =
+                updatedTask.length > 5 ? (updatedTask[5] as List<DateTime>?) ?? [] : <DateTime>[];
 
-            if (reminder != null) {
-              NotificationService().scheduleReminder(
-                index: index,
-                title: (updatedTask[0] ?? '').toString(),
-                body: (updatedTask[1] ?? '').toString(),
-                scheduledTime: reminder,
-              );
-            } else {
-              NotificationService().cancelReminder(index);
-            }
+            NotificationService().scheduleReminder(
+              index: index,
+              title: (updatedTask[0] ?? '').toString(),
+              body: (updatedTask[1] ?? '').toString(),
+              scheduledTimes: reminders,
+            );
           },
         ),
       ),

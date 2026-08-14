@@ -95,7 +95,7 @@ class NotificationService {
     _timeZoneConfigured = true;
   }
 
-  int _idForTask(int index) => index + 1;
+  int _idForTaskReminder(int index, int reminderIndex) => (index + 1) * 100 + reminderIndex;
 
   Future<void> askPermissionsAtStartup() async {
     await init();
@@ -106,16 +106,15 @@ class NotificationService {
     required int index,
     required String title,
     required String body,
-    required DateTime scheduledTime,
+    required List<DateTime> scheduledTimes,
   }) async {
-    final now = DateTime.now();
-    if (scheduledTime.isBefore(now.subtract(const Duration(seconds: 5)))) {
-      return;
-    }
-
     await init();
-    // We already requested permissions at startup; avoid depending on
-    // exact alarm permission here to keep behaviour more reliable.
+    
+    // First, cancel any existing reminders for this task to avoid duplicates/orphans
+    await cancelReminder(index);
+    
+    if (scheduledTimes.isEmpty) return;
+    
     final (canSchedule, scheduleMode) = await _ensurePermissions();
     if (!canSchedule) return;
 
@@ -130,26 +129,38 @@ class NotificationService {
     );
 
     const details = NotificationDetails(android: androidDetails);
+    final now = DateTime.now();
 
-    final scheduledDate = tz.TZDateTime.from(scheduledTime, tz.local);
+    for (int i = 0; i < scheduledTimes.length; i++) {
+      final scheduledTime = scheduledTimes[i];
+      
+      if (scheduledTime.isBefore(now.subtract(const Duration(seconds: 5)))) {
+        continue;
+      }
 
-    await _flutterLocalNotificationsPlugin.zonedSchedule(
-      _idForTask(index),
-      title.isEmpty ? 'Task Reminder' : (title[0].toUpperCase() + title.substring(1)),
-      body.isEmpty ? 'You have a scheduled task.' : (body[0].toUpperCase() + body.substring(1)),
-      scheduledDate,
-      details,
-      androidScheduleMode: scheduleMode ?? AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: null,
-      payload: index.toString(),
-    );
+      final scheduledDate = tz.TZDateTime.from(scheduledTime, tz.local);
+
+      await _flutterLocalNotificationsPlugin.zonedSchedule(
+        _idForTaskReminder(index, i),
+        title.isEmpty ? 'Task Reminder' : (title[0].toUpperCase() + title.substring(1)),
+        body.isEmpty ? 'You have a scheduled task.' : (body[0].toUpperCase() + body.substring(1)),
+        scheduledDate,
+        details,
+        androidScheduleMode: scheduleMode ?? AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: null,
+        payload: index.toString(),
+      );
+    }
   }
 
   Future<void> cancelReminder(int index) async {
     await init();
-    await _flutterLocalNotificationsPlugin.cancel(_idForTask(index));
+    // Cancel up to 20 potential reminders for this task
+    for (int i = 0; i < 20; i++) {
+      await _flutterLocalNotificationsPlugin.cancel(_idForTaskReminder(index, i));
+    }
   }
 
   Future<void> cancelAll() async {
