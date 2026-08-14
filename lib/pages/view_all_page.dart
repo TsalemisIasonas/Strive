@@ -31,7 +31,7 @@ class _ViewAllPageState extends State<ViewAllPage> {
 
   List filteredList({bool sortPinnedFirst = false}) {
     List tasks = _searchQuery.isEmpty
-        ? widget.db.toDoList
+        ? widget.db.toDoList.toList()
         : widget.db.toDoList.where((task) {
             final title = task[0].toString().toLowerCase();
             final content = task[1].toString().toLowerCase();
@@ -157,15 +157,93 @@ class _ViewAllPageState extends State<ViewAllPage> {
             child: Builder(
               builder: (context) {
                 final sortedTasks = filteredList(sortPinnedFirst: true);
-                return ListView.builder(
+                return ReorderableListView.builder(
                   padding: const EdgeInsets.only(top: 15, bottom: 40),
                   itemCount: sortedTasks.length,
+                  proxyDecorator: (Widget child, int index, Animation<double> animation) {
+                    return Material(
+                      type: MaterialType.transparency,
+                      elevation: 0,
+                      child: Stack(
+                        children: [
+                          child,
+                          Positioned(
+                            left: 10,
+                            right: 10,
+                            top: 10,
+                            bottom: 0,
+                            child: IgnorePointer(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.greenAccent, width: 2.5),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  onReorder: (oldIndex, newIndex) {
+                    setState(() {
+                      if (newIndex > oldIndex) {
+                        newIndex -= 1;
+                      }
+                      
+                      final task = sortedTasks[oldIndex];
+                      final originalOldIndex = widget.db.toDoList.indexOf(task);
+                      
+                      // Calculate the insertion point by manipulating the underlying db.toDoList 
+                      // based on relative positions in sortedTasks.
+                      final item = widget.db.toDoList.removeAt(originalOldIndex);
+                      
+                      // Re-build sortedTasks without the removed item to find the correct insertion point
+                      final updatedSorted = List.from(sortedTasks)..removeAt(oldIndex);
+                      
+                      // Auto pin/unpin based on drop location
+                      bool newPinStatus = false;
+                      if (newIndex >= updatedSorted.length) {
+                        if (updatedSorted.isNotEmpty) {
+                          final lastTask = updatedSorted.last;
+                          newPinStatus = lastTask.length > 4 && lastTask[4] == true;
+                        }
+                      } else {
+                        final anchorTask = updatedSorted[newIndex];
+                        newPinStatus = anchorTask.length > 4 && anchorTask[4] == true;
+                      }
+                      
+                      while (item.length <= 4) {
+                        item.add(false);
+                      }
+                      item[4] = newPinStatus;
+                      if (newIndex >= updatedSorted.length) {
+                        // Drop at end
+                        if (_sortNewestFirst) {
+                          widget.db.toDoList.insert(0, item);
+                        } else {
+                          widget.db.toDoList.add(item);
+                        }
+                      } else {
+                        final anchorTask = updatedSorted[newIndex];
+                        final anchorOriginalIndex = widget.db.toDoList.indexOf(anchorTask);
+                        if (_sortNewestFirst) {
+                           widget.db.toDoList.insert(anchorOriginalIndex + 1, item);
+                        } else {
+                           widget.db.toDoList.insert(anchorOriginalIndex, item);
+                        }
+                      }
+                      
+                      widget.db.updateDataBase();
+                    });
+                  },
                   itemBuilder: (context, index) {
                     final task = sortedTasks[index];
                     final originalIndex = widget.db.toDoList.indexOf(task);
                     final isPinned = task.length > 4 && task[4] == true;
 
                     return ToDoTileFlat(
+                      key: ValueKey(task),
                       taskTitle: task[0],
                       taskContent: task[1],
                       taskDateTime: task[2],
